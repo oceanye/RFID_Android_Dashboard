@@ -124,10 +124,11 @@ public class EpcAssembleLinkFragment extends BaseFragment {
 
     // 添加扫描到的标签列表和相关变量
     private List<EpcTagInfo> scannedTags = new ArrayList<>();
-    private int scanCount = 0;
-    private final int MAX_SCAN_COUNT = 100; // 增加到100次扫描
+    private int scanCycleCount = 0; // 扫描轮次计数
+    private final int SCAN_CYCLE_RESET = 200; // 每200轮次重置一次计数（约40秒）
     private final int MAX_TAGS_LIMIT = 50; // 最大标签数限制，防止内存溢出
     private boolean continuousMode = true; // 连续扫描模式
+    private long scanStartTime = 0; // 扫描开始时间
 
     // EPC标签信息类
     public static class EpcTagInfo {
@@ -376,33 +377,31 @@ public class EpcAssembleLinkFragment extends BaseFragment {
                 // 继续执行，功率设置失败不影响扫描
             }
             
-            // 更新UI状态（注意：不要完全清空之前的标签，允许累积扫描）
-            scanCount = 0;       // 重置扫描计数
+            // 每次开始扫描都重新开始 - 清空所有历史数据
+            clearAllScanData();
             
-            // 如果之前没有扫描结果，或用户明确要重新开始，才清空
-            if (scannedTags.isEmpty()) {
-                Log.d(TAG, "Starting fresh scan - no previous tags");
-            } else {
-                Log.d(TAG, "Continuing scan with " + scannedTags.size() + " existing tags");
-                // 保持现有标签的计数不变，只是继续累积新的扫描结果
-                // 不再减半计数，让用户看到真实的累积次数
-                Log.d(TAG, "Existing tags will continue accumulating scan counts");
-            }
+            // 重新开始计数
+            scanCycleCount = 0;
+            scanStartTime = System.currentTimeMillis();
+            
+            Log.d(TAG, "Starting fresh scan - all data cleared, counters reset");
             
             // 显示实时排名区域
             tvTopEpcsTitle.setVisibility(View.VISIBLE);
             llTopEpcsContainer.setVisibility(View.VISIBLE);
             
             if (scannedTags.isEmpty()) {
-                resetTop3Display(); // 只有没有数据时才重置显示
+                resetTop3Display(); // 重置显示
             }
             
             isScanning = true;
             btnScanEpc.setEnabled(false);
             btnStopScan.setEnabled(true);
-            tvUploadStatus.setText(getString(R.string.scanning_for_epc) + " (0/" + MAX_SCAN_COUNT + ")");
             
-            showToast("开始扫描EPC标签...");
+            // 更新状态显示 - 显示重新开始扫描
+            tvUploadStatus.setText("开始新的扫描... (00:00)");
+            
+            showToast("开始新的EPC扫描...");
             Log.d(TAG, "Starting real UHF scanning with power 15...");
             
             // 启动扫描线程
@@ -422,17 +421,52 @@ public class EpcAssembleLinkFragment extends BaseFragment {
 
     @OnClick(R.id.btn_stop_scan)
     public void stopEpcScanning() {
-        Log.d(TAG, "Stopping EPC scanning...");
+        Log.d(TAG, "Stopping EPC scanning and clearing all data...");
         isScanning = false;
         btnScanEpc.setEnabled(true);
         btnStopScan.setEnabled(false);
-        tvUploadStatus.setText("扫描已停止 - 可继续扫描或重新开始");
         
         if (handler != null) {
             handler.removeCallbacks(scanningRunnable);
         }
         
-        Log.d(TAG, "EPC scanning stopped, " + scannedTags.size() + " unique tags found");
+        // 停止扫描时自动清空所有内容
+        clearAllScanData();
+        
+        tvUploadStatus.setText("扫描已停止，数据已清空");
+        showToast("扫描停止，数据已清空");
+        
+        Log.d(TAG, "EPC scanning stopped and data cleared");
+    }
+    
+    // 清空所有扫描数据的方法
+    private void clearAllScanData() {
+        try {
+            Log.d(TAG, "Clearing all scan data...");
+            
+            // 清空所有数据
+            scannedTags.clear();
+            currentEpcId = "";
+            currentRssi = "";
+            scanCycleCount = 0;
+            scanStartTime = 0;
+            
+            // 重置UI显示
+            resetTop3Display();
+            tvTopEpcsTitle.setVisibility(View.GONE);
+            llTopEpcsContainer.setVisibility(View.GONE);
+            
+            if (tvScannedEpc != null) {
+                tvScannedEpc.setText(getString(R.string.no_epc_scanned));
+            }
+            
+            updateSummary();
+            updateButtonStates();
+            
+            Log.d(TAG, "All scan data cleared successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Error clearing scan data: " + e.getMessage(), e);
+        }
     }
     
     // 添加清除扫描历史的方法
@@ -471,12 +505,17 @@ public class EpcAssembleLinkFragment extends BaseFragment {
                 return;
             }
             
-            scanCount++;
-            Log.d(TAG, "Executing EPC scanning runnable - scan " + scanCount + "/" + MAX_SCAN_COUNT);
+            scanCycleCount++;
             
-            // 更新进度
+            // 更新扫描时长显示
+            long scanDuration = (System.currentTimeMillis() - scanStartTime) / 1000; // 秒
+            String timeDisplay = String.format("%02d:%02d", scanDuration / 60, scanDuration % 60);
+            
+            Log.d(TAG, "Executing EPC scanning cycle " + scanCycleCount + " - Duration: " + timeDisplay);
+            
+            // 更新进度显示 - 显示时长和检测到的标签数
             if (tvUploadStatus != null) {
-                tvUploadStatus.setText(getString(R.string.scanning_for_epc) + " (" + scanCount + "/" + MAX_SCAN_COUNT + ")");
+                tvUploadStatus.setText(String.format("扫描中 %s | 已发现 %d 个标签", timeDisplay, scannedTags.size()));
             }
             
             try {
@@ -551,24 +590,14 @@ public class EpcAssembleLinkFragment extends BaseFragment {
                 Log.e(TAG, "Error during EPC scanning: " + e.getMessage(), e);
             }
             
-            // 检查是否达到扫描次数上限（在连续模式下循环重置）
-            if (scanCount >= MAX_SCAN_COUNT) {
-                if (continuousMode) {
-                    Log.d(TAG, "Reached scan limit, resetting count for continuous scanning");
-                    scanCount = 0; // 重置计数，继续扫描
-                    // 更新进度显示
-                    if (tvUploadStatus != null) {
-                        tvUploadStatus.setText("持续扫描中... (已完成" + MAX_SCAN_COUNT + "次循环)");
-                    }
-                } else {
-                    Log.d(TAG, "Reached maximum scan count, stopping");
-                    isScanning = false;
-                    handler.sendEmptyMessage(MSG_SCAN_COMPLETED);
-                    return;
-                }
+            // 检查是否达到扫描轮次重置点（纯粹为了避免计数溢出）
+            if (scanCycleCount >= SCAN_CYCLE_RESET) {
+                Log.d(TAG, "Reached scan cycle reset point, resetting counter (continuous scanning continues)");
+                scanCycleCount = 0; // 重置计数，避免溢出，但继续扫描
+                // 不更新UI显示，用户无需关心轮次计数的重置
             }
             
-            // 继续扫描
+            // 继续扫描 - 无时间限制
             if (isScanning) {
                 handler.postDelayed(this, 200); // 间隔200ms
             }
@@ -795,18 +824,16 @@ public class EpcAssembleLinkFragment extends BaseFragment {
         }
     }
     
-    // 扫描完成处理
+    // 扫描完成处理 - 简化逻辑，因为停止扫描会自动清空
     private void onScanCompleted() {
         try {
             Log.d(TAG, "Scan completed with " + scannedTags.size() + " unique tags");
             
             if (scannedTags.isEmpty()) {
                 showToast("未扫描到任何EPC标签");
-                tvTopEpcsTitle.setVisibility(View.GONE);
-                llTopEpcsContainer.setVisibility(View.GONE);
                 tvUploadStatus.setText("扫描完成 - 未发现RFID标签");
             } else {
-                // 创建排序副本
+                // 自动选择信号最强的标签
                 List<EpcTagInfo> sortedTags = new ArrayList<>(scannedTags);
                 sortedTags.removeIf(tag -> tag == null || tag.epc == null);
                 Collections.sort(sortedTags, (tag1, tag2) -> Integer.compare(tag2.rssi, tag1.rssi));
@@ -820,38 +847,21 @@ public class EpcAssembleLinkFragment extends BaseFragment {
                     if (tvScannedEpc != null) {
                         tvScannedEpc.setText(getString(R.string.epc_with_colon) + currentEpcId);
                     }
-                    tvUploadStatus.setText("扫描完成 - 已自动选择信号最强标签 (可继续扫描)");
                     
                     UtilSound.play(1, 0); // 播放成功音
-                    showToast("扫描完成！已选择信号最强的EPC (可继续扫描)");
+                    showToast("扫描完成！已选择信号最强的EPC");
                     
                     updateSummary();
                     updateButtonStates();
                 } else {
                     Log.w(TAG, "No valid tags after filtering");
-                    tvUploadStatus.setText("扫描完成 - 标签数据无效");
                 }
             }
             
-            // 重要：不要禁用扫描按钮，允许继续扫描
-            btnScanEpc.setEnabled(true);
-            btnStopScan.setEnabled(false);
-            isScanning = false;
-            
-            // 扫描完成后，不隐藏排名显示，保持可见以便再次扫描
-            if (!scannedTags.isEmpty()) {
-                tvTopEpcsTitle.setVisibility(View.VISIBLE);
-                llTopEpcsContainer.setVisibility(View.VISIBLE);
-            }
-            
-            Log.d(TAG, "Scan completion handling finished, ready for next scan");
+            // 注意：不需要重置按钮状态，因为扫描会继续运行直到用户点击停止
+            Log.d(TAG, "Scan completion handling finished");
         } catch (Exception e) {
             Log.e(TAG, "Error in onScanCompleted: " + e.getMessage(), e);
-            // 确保扫描状态被正确重置
-            btnScanEpc.setEnabled(true);
-            btnStopScan.setEnabled(false);
-            isScanning = false;
-            tvUploadStatus.setText("扫描完成时发生错误，可重新扫描");
         }
     }
 
@@ -953,24 +963,14 @@ public class EpcAssembleLinkFragment extends BaseFragment {
 
     @OnClick(R.id.btn_clear_assemble)
     public void clearAssembleId() {
-        // 创建对话框让用户选择清除范围
-        new AlertDialog.Builder(mainActivity)
-            .setTitle("清除数据")
-            .setMessage("请选择要清除的数据:")
-            .setPositiveButton("仅清除组装件ID", (dialog, which) -> {
-                etAssembleId.setText("");
-                updateSummary();
-                updateButtonStates();
-                showToast("组装件ID已清除");
-            })
-            .setNegativeButton("清除所有扫描数据", (dialog, which) -> {
-                etAssembleId.setText("");
-                clearScanHistory();
-            })
-            .setNeutralButton("取消", null)
-            .show();
+        // 简化功能：只清除组装件ID输入框
+        etAssembleId.setText("");
+        updateSummary();
+        updateButtonStates();
+        showToast("组装件ID已清除");
+        Log.d(TAG, "Assembly ID cleared");
     }
-
+    
     @OnClick(R.id.btn_confirm_upload)
     public void confirmAndUpload() {
         if (validateInput()) {
