@@ -5,7 +5,8 @@
       "Bash(./gradlew:*)",
       "Bash(gradle clean:*)",
       "Bash(java:*)",
-      "Bash(gradlew.bat clean:*)"
+      "Bash(gradlew.bat clean:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
