@@ -1,0 +1,22 @@
+# Project-wide Gradle settings - 临时解决方案
+# 移除org.gradle.java.home配置，让Android Studio自动检测JDK
+
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+
+# 不指定java.home，让Android Studio自动选择JDK
+# org.gradle.java.home= (已注释掉)
+
+# AndroidX配置
+android.useAndroidX=true
+android.enableJetifier=true
+
+# 性能优化
+org.gradle.parallel=true
+org.gradle.caching=true
+org.gradle.configureondemand=true
+
+# 说明：
+# 1. 先尝试这个配置，让Android Studio自动检测JDK
+# 2. 如果仍有问题，手动在Android Studio中设置：
+#    File → Settings → Build Tools → Gradle → Gradle JDK
+# 3. 选择任何可用的JDK 11+版本

@@ -1,0 +1,37 @@
+# 备用Gradle配置 - 如果主配置不工作请使用此内容替换gradle.properties
+
+# Project-wide Gradle settings.
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+
+# 方案1：使用Android Studio内置JDK（推荐）
+org.gradle.java.home=C:\\Program Files\\Android\\Android Studio\\jre
+
+# 方案2：如果方案1不工作，尝试以下路径之一（取消注释一个）
+# org.gradle.java.home=C:\\Program Files\\Android\\Android Studio\\jbr
+# org.gradle.java.home=C:\\Users\\%USERNAME%\\AppData\\Local\\Android\\Sdk\\jre
+# org.gradle.java.home=C:\\Program Files\\Java\\jdk-11.0.19
+
+# 方案3：使用系统JAVA_HOME（如果指向JDK 11+）
+# org.gradle.java.home=${JAVA_HOME}
+
+# AndroidX配置
+android.useAndroidX=true
+android.enableJetifier=true
+
+# 性能优化
+org.gradle.parallel=true
+org.gradle.caching=true
+org.gradle.configureondemand=true
+
+# 如果遇到内存问题，可以增加内存
+# org.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8
+
+##############################################
+# 使用说明：
+# 1. 如果当前配置不工作，请尝试方案2中的其他路径
+# 2. 可以在Windows命令行中运行以下命令查找JDK：
+#    where java
+#    echo %JAVA_HOME%
+# 3. 在Android Studio中也可以通过以下方式查看：
+#    File → Settings → Build Tools → Gradle → Gradle JDK
+##############################################
