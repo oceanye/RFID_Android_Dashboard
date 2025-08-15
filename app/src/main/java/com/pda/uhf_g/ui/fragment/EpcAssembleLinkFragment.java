@@ -116,6 +116,7 @@ public class EpcAssembleLinkFragment extends BaseFragment {
     private boolean isScanning = false;
     private String currentEpcId = "";
     private String currentRssi = "";
+    private boolean userManuallySelected = false; // 用户是否手动选择过EPC
     private EpcAssembleLink currentLink;
     private KeyReceiver keyReceiver;
     private TextRecognizer textRecognizer;
@@ -135,11 +136,13 @@ public class EpcAssembleLinkFragment extends BaseFragment {
         public String epc;
         public int rssi;
         public int count; // 被扫描到的次数
+        public long lastSeenTime; // 最后检测时间
         
         public EpcTagInfo(String epc, int rssi) {
             this.epc = epc;
             this.rssi = rssi;
             this.count = 1;
+            this.lastSeenTime = System.currentTimeMillis();
         }
         
         @Override
@@ -380,6 +383,9 @@ public class EpcAssembleLinkFragment extends BaseFragment {
             // 每次开始扫描都重新开始 - 清空所有历史数据
             clearAllScanData();
             
+            // 重置手动选择标志
+            userManuallySelected = false;
+            
             // 重新开始计数
             scanCycleCount = 0;
             scanStartTime = System.currentTimeMillis();
@@ -421,7 +427,7 @@ public class EpcAssembleLinkFragment extends BaseFragment {
 
     @OnClick(R.id.btn_stop_scan)
     public void stopEpcScanning() {
-        Log.d(TAG, "Stopping EPC scanning and clearing all data...");
+        Log.d(TAG, "Stopping EPC scanning and keeping current EPC...");
         isScanning = false;
         btnScanEpc.setEnabled(true);
         btnStopScan.setEnabled(false);
@@ -430,13 +436,58 @@ public class EpcAssembleLinkFragment extends BaseFragment {
             handler.removeCallbacks(scanningRunnable);
         }
         
-        // 停止扫描时自动清空所有内容
-        clearAllScanData();
+        // 停止扫描时保持扫描结果，允许用户继续选择
+        scanCycleCount = 0;
+        scanStartTime = 0;
         
-        tvUploadStatus.setText("扫描已停止，数据已清空");
-        showToast("扫描停止，数据已清空");
+        // 保持排名显示开启，允许用户选择
+        tvTopEpcsTitle.setVisibility(View.VISIBLE);
+        llTopEpcsContainer.setVisibility(View.VISIBLE);
         
-        Log.d(TAG, "EPC scanning stopped and data cleared");
+        // 如果有扫描到标签，自动选择信号最强的
+        if (!scannedTags.isEmpty()) {
+            // 创建排序副本选择信号最强的标签
+            List<EpcTagInfo> sortedTags = new ArrayList<>(scannedTags);
+            sortedTags.removeIf(tag -> tag == null || tag.epc == null);
+            Collections.sort(sortedTags, (tag1, tag2) -> Integer.compare(tag2.rssi, tag1.rssi));
+            
+            if (!sortedTags.isEmpty()) {
+                EpcTagInfo bestTag = sortedTags.get(0);
+                currentEpcId = bestTag.epc;
+                currentRssi = String.valueOf(bestTag.rssi);
+                
+                // 更新显示
+                tvScannedEpc.setText(getString(R.string.epc_with_colon) + currentEpcId);
+                tvUploadStatus.setText("扫描已停止，已选择最强信号EPC: " + currentEpcId);
+                showToast("扫描停止，已自动选择最强信号EPC");
+                
+                // 高亮选中的第一名（自动选择）
+                selectEpcByRank(0);
+                userManuallySelected = false; // 这是自动选择，不是手动选择
+            } else {
+                currentEpcId = "";
+                currentRssi = "";
+                tvScannedEpc.setText(getString(R.string.no_epc_scanned));
+                tvUploadStatus.setText("扫描已停止，未发现有效标签");
+                showToast("扫描停止，未发现有效标签");
+            }
+        } else {
+            currentEpcId = "";
+            currentRssi = "";
+            tvScannedEpc.setText(getString(R.string.no_epc_scanned));
+            tvUploadStatus.setText("扫描已停止，未扫描到标签");
+            showToast("扫描停止，未扫描到标签");
+            
+            // 没有标签时隐藏排名显示
+            tvTopEpcsTitle.setVisibility(View.GONE);
+            llTopEpcsContainer.setVisibility(View.GONE);
+            resetTop3Display();
+        }
+        
+        updateSummary();
+        updateButtonStates();
+        
+        Log.d(TAG, "EPC scanning stopped, preserved EPC: " + currentEpcId);
     }
     
     // 清空所有扫描数据的方法
@@ -448,6 +499,7 @@ public class EpcAssembleLinkFragment extends BaseFragment {
             scannedTags.clear();
             currentEpcId = "";
             currentRssi = "";
+            userManuallySelected = false; // 重置手动选择标志
             scanCycleCount = 0;
             scanStartTime = 0;
             
@@ -636,13 +688,14 @@ public class EpcAssembleLinkFragment extends BaseFragment {
             }
             
             if (existingTag != null) {
-                // 更新现有标签（每次检测到都增加计数）
+                // 更新现有标签 - 实时更新信号强度
                 existingTag.count++;
-                // 如果新的信号更强，更新RSSI
-                if (rssi > existingTag.rssi) {
-                    existingTag.rssi = rssi;
-                }
-                Log.d(TAG, "Updated existing tag: " + epcData + ", new count: " + existingTag.count + ", best RSSI: " + existingTag.rssi);
+                existingTag.rssi = rssi; // 实时更新当前信号强度
+                existingTag.lastSeenTime = System.currentTimeMillis(); // 更新最后检测时间
+                
+                Log.d(TAG, "Updated existing tag: " + epcData + 
+                    ", count: " + existingTag.count + 
+                    ", current RSSI: " + existingTag.rssi);
             } else {
                 // 添加新标签
                 EpcTagInfo newTag = new EpcTagInfo(epcData, rssi);
@@ -724,28 +777,46 @@ public class EpcAssembleLinkFragment extends BaseFragment {
                         String shortEpc = tag.epc.length() > 8 ? 
                             tag.epc.substring(tag.epc.length() - 8) : tag.epc;
                         
-                        String displayText = String.format("%s %s\\nRSSI: %ddBm | 次数: %d", 
+                        // 信号强度显示图标
+                        String rssiIcon = "";
+                        if (tag.rssi >= -40) {
+                            rssiIcon = " 📶"; // 信号强
+                        } else if (tag.rssi >= -60) {
+                            rssiIcon = " 📊"; // 信号中等
+                        } else {
+                            rssiIcon = " 📉"; // 信号弱
+                        }
+                        
+                        String displayText = String.format("%s %s%s\n当前: %ddBm | 次数: %d", 
                             medals[i], 
                             shortEpc,
-                            tag.rssi, 
+                            rssiIcon,
+                            tag.rssi,      // 当前实时信号强度
                             tag.count);
                         
                         rankViews[i].setText(displayText);
                         rankViews[i].setEnabled(true);
-                        rankViews[i].setBackgroundColor(normalColors[i]);
                         
-                        // 第一名默认高亮并自动选择
+                        // 根据信号强度动态调整背景色
+                        int bgColor = normalColors[i];
+                        if (tag.rssi >= -40) {
+                            // 强信号时，使用更亮的背景
+                            bgColor = (i == 0) ? 0xFFD4F8D4 : (i == 1) ? 0xFFFFF3C4 : 0xFFF8E8FF;
+                        }
+                        rankViews[i].setBackgroundColor(bgColor);
+                        
+                        // 第一名默认高亮，但只在未手动选择时自动切换
                         if (i == 0) {
                             rankViews[i].setBackgroundColor(0xFFE8F5E8); // 绿色高亮
-                            // 只有当前选中的EPC不是最强的时才自动切换
-                            if (currentEpcId == null || !currentEpcId.equals(tag.epc)) {
+                            // 只有在用户没有手动选择过且当前未选中最强信号时才自动切换
+                            if (!userManuallySelected && (currentEpcId == null || !currentEpcId.equals(tag.epc))) {
                                 selectEpcByRank(0);
                             }
                         }
                         
-                        // 调试：如果计数大于1，输出详细信息
+                        // 调试：输出实时信号强度变化
                         if (tag.count > 1) {
-                            Log.v(TAG, "Tag " + shortEpc + " has been detected " + tag.count + " times, RSSI: " + tag.rssi);
+                            Log.v(TAG, "Tag " + shortEpc + " - Current: " + tag.rssi + "dBm, Count: " + tag.count);
                         }
                     } else {
                         Log.w(TAG, "Tag or EPC is null at index " + i);
@@ -797,6 +868,12 @@ public class EpcAssembleLinkFragment extends BaseFragment {
             
             currentEpcId = selectedTag.epc;
             currentRssi = String.valueOf(selectedTag.rssi);
+            
+            // 标记为手动选择（除非是初始化时的自动选择）
+            if (rank > 0 || userManuallySelected) {
+                userManuallySelected = true;
+                Log.d(TAG, "User manually selected EPC at rank: " + (rank + 1));
+            }
             
             if (tvScannedEpc != null) {
                 tvScannedEpc.setText(getString(R.string.epc_with_colon) + currentEpcId);

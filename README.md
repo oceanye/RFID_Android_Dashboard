@@ -45,14 +45,14 @@ This is a demo application for the UHF-G RFID SDK version 3.6. The application p
 4. **Input Assembly ID** - Manual entry or advanced OCR with mask/paint modes
 5. **Upload & Monitor** - Server upload with comprehensive error handling
 
-#### Advanced Features:
+#### Enhanced Features:
 - **🔄 Continuous Scanning**: No scan limits - detects RFID chips coming and going
-- **📊 Signal Analytics**: Real-time RSSI values and detection frequency
-- **🎯 Smart Selection**: Automatically selects strongest signal as default
-- **👆 Manual Override**: Click to select any of the top 3 detected tags
+- **📊 Current Signal Display**: Real-time RSSI values with simplified, clean format
+- **🎯 Smart Selection**: Auto-selects strongest signal initially, preserves user manual selection
+- **👆 Persistent Selection**: Once user selects 🥈 or 🥉, selection is maintained (no auto-jump back)
 - **🛡️ Crash Protection**: Memory management for 50+ simultaneous tags
-- **💾 Data Persistence**: Retains scan history between sessions
-- **🧹 Smart Cleanup**: User-controlled data clearing options
+- **💾 Smart Stop Behavior**: Stop scanning keeps ranking visible for continued selection
+- **🧹 Intuitive Reset**: Start scan clears all data for fresh start
 
 #### OCR Enhancements:
 - **Mask Mode**: Rectangular area selection for precise text recognition
@@ -226,10 +226,10 @@ cd "UHF-G_V3.6_20230821"
 5. **Continuous Operation**: Scan runs indefinitely - no time limits
 
 ### Advanced Features
-- **Data Persistence**: Scan history retained between sessions
-- **Smart Cleanup**: Use "清除" button for selective data clearing
-- **Crash Protection**: Handles memory overflow from 50+ simultaneous tags
+- **Data Persistence**: Scan results preserved when stopping (no auto-clear)
+- **Smart Cleanup**: Clear button available for manual data reset when needed
 - **Network Monitoring**: Real-time server connectivity status
+- **Persistent Ranking**: Stop scanning maintains top 3 display for easy re-selection
 
 ### Dashboard Access
 1. Open web browser
@@ -291,7 +291,13 @@ mysql -u root -p -e "SELECT COUNT(*) FROM epc_system.epc_assemble_links;"
 
 ## 🔄 Version History
 
-### v3.6.3 (Current) - Real-time Scanning Revolution
+### v3.6.4 (Current) - Enhanced User Selection Experience
+- ✅ **Optimized Selection Logic**: User manual selection is preserved, no auto-jump back to strongest signal
+- ✅ **Simplified Display**: Shows only current RSSI (removed maxRssi), fixed line break display issue
+- ✅ **Smart Stop Behavior**: Stop scanning preserves ranking display for continued selection
+- ✅ **Intuitive Workflow**: Start scan = reset all, stop scan = preserve selection with ranking visible
+
+### v3.6.3 - Real-time Scanning Revolution  
 - ✅ **Real-time Top 3 EPC Display**: Live signal strength ranking
 - ✅ **Continuous Scanning**: Unlimited scan cycles with count accumulation
 - ✅ **Advanced Memory Management**: Crash protection for 50+ tags
@@ -354,6 +360,6 @@ Proprietary - UHF-G SDK License Agreement applies.
 
 ---
 
-**Latest Update**: December 2024 - Real-time scanning system with continuous RFID detection, advanced signal analytics, and comprehensive server infrastructure deployed to production.
+**Latest Update**: January 2025 - Enhanced user selection experience with persistent manual selection, simplified RSSI display showing only current signal strength, and improved stop scanning behavior that preserves ranking display for continued selection flexibility.
 
 🚀 **Key Achievement**: Solved the "scan count freeze" and "RFID re-detection" issues with continuous scanning architecture supporting unlimited tag detection cycles and real-time signal strength analysis.
