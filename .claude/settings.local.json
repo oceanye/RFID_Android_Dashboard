@@ -8,7 +8,9 @@
       "Bash(gradlew.bat clean:*)",
       "Bash(git add:*)",
       "Bash(grep:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(chmod:*)",
+      "Bash(scp:*)"
     ],
     "deny": []
   }

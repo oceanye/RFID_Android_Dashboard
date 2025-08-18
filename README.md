@@ -1,365 +1,300 @@
-# UHF-G SDK V3.6 Demo Application
+# EPC-RFID追踪系统 v3.6.5
 
-## Overview
-This is a demo application for the UHF-G RFID SDK version 3.6. The application provides comprehensive RFID tag management capabilities including inventory, reading, writing, and an advanced EPC-Assemble ID linking system with real-time scanning and server integration.
+## 🏗️ 项目概述
 
-## 🚀 Latest Features (v3.6.3)
+EPC-RFID追踪系统是专为建筑工业设计的RFID标签管理和设备追踪平台，支持PDA、PC基站等多种设备的数据采集，提供实时监控、状态管理和数据分析功能。
 
-### 🔥 Advanced Real-time EPC Scanning System
-- **Real-time Top 3 Display**: Live ranking of strongest RFID signals with 🥇🥈🥉 medals
-- **Signal Strength Analysis**: RSSI values and detection counts for each tag
-- **Continuous Scanning**: No time limits - scan indefinitely with automatic count accumulation
-- **Smart Tag Selection**: Auto-select strongest signal, manual override available
-- **Memory Protection**: Handles 50+ tags with automatic cleanup and crash protection
-- **Cumulative Counting**: Real-time display of detection frequency per tag
+### 🆕 v3.6.5 新特性
 
-### 📊 EPC Data Dashboard
-- **Web-based Dashboard**: Comprehensive data visualization at `http://175.24.178.44:8082/epc-dashboard.html`
-- **Real-time Statistics**: Live EPC scan counts, assembly data, and trend analysis
-- **Interactive Charts**: Chart.js powered visualizations with responsive design
-- **Data Export**: Excel and PDF export capabilities
-- **Search & Filter**: Advanced filtering by date, EPC, assembly ID
+- **📥 数据导出管理** - CSV格式导出，支持完整字段信息
+- **🗑️ 安全数据清理** - 双重确认机制的数据清空功能
+- **⚙️ 动态状态配置** - 服务器端管理，Android设备自动同步
+- **📱 智能状态同步** - 应用启动时自动获取最新状态配置
+- **🎨 增强用户界面** - 优化的Dashboard和模态框设计
 
-### 🌐 Complete Server Infrastructure
-- **API Server**: Node.js Express server with comprehensive CRUD operations
-- **Database**: MySQL with isolated tables (port 8082 vs existing port 8081)
-- **Authentication**: HTTP Basic Auth with secure credentials
-- **Health Monitoring**: Server status endpoints and connectivity checks
-- **Auto-deployment**: Scripted deployment with system service management
+## 📁 项目结构
 
-## Features
-
-### Core RFID Functions
-- **Advanced Inventory Management** - Real-time scanning with smart tag ranking
-- **LED Inventory** - Visual feedback during tag scanning
-- **Read/Write Tags** - Comprehensive tag data manipulation
-- **Temperature Tags** - Support for temperature sensor tags
-- **Settings** - Configure RFID parameters and device settings
-
-### 🆕 EPC-Assemble ID Linking System
-
-#### Enhanced Scanning Workflow:
-1. **Start Scanning** - Continuous high-power (level 15) RFID detection
-2. **Real-time Display** - Top 3 strongest signals with live updates
-3. **Smart Selection** - Auto-select closest tag, manual override available
-4. **Input Assembly ID** - Manual entry or advanced OCR with mask/paint modes
-5. **Upload & Monitor** - Server upload with comprehensive error handling
-
-#### Enhanced Features:
-- **🔄 Continuous Scanning**: No scan limits - detects RFID chips coming and going
-- **📊 Current Signal Display**: Real-time RSSI values with simplified, clean format
-- **🎯 Smart Selection**: Auto-selects strongest signal initially, preserves user manual selection
-- **👆 Persistent Selection**: Once user selects 🥈 or 🥉, selection is maintained (no auto-jump back)
-- **🛡️ Crash Protection**: Memory management for 50+ simultaneous tags
-- **💾 Smart Stop Behavior**: Stop scanning keeps ranking visible for continued selection
-- **🧹 Intuitive Reset**: Start scan clears all data for fresh start
-
-#### OCR Enhancements:
-- **Mask Mode**: Rectangular area selection for precise text recognition
-- **Paint Mode**: Freeform drawing to highlight text areas
-- **Advanced Camera**: High-resolution capture with manual focus control
-- **ML Kit Integration**: Google's latest OCR technology
-
-## Technical Specifications
-
-### Requirements
-- **Android Version**: API 21+ (Android 5.0)
-- **Target SDK**: 30 (Java 8 compatible)
-- **Build Tools**: 30.0.3
-- **Java Version**: 1.8
-- **Gradle**: 6.7.1 (Android Gradle Plugin 4.2.2)
-
-### Key Dependencies
-```gradle
-// Network & JSON
-implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-implementation 'com.google.code.gson:gson:2.10.1'
-
-// ML Kit OCR
-implementation 'com.google.mlkit:text-recognition:16.0.0'
-
-// UI Components
-implementation 'androidx.navigation:navigation-fragment:2.5.3'
-implementation 'androidx.navigation:navigation-ui:2.5.3'
-implementation 'com.google.android.material:material:1.9.0'
+```
+EPC-RFID-System/
+├── 📱 Android应用
+│   ├── app/src/main/java/com/pda/uhf_g/
+│   │   ├── entity/EpcRecord.java          # 增强实体类（v3.6.5）
+│   │   └── ui/fragment/
+│   │       └── EpcAssembleLinkFragment.java # 动态状态加载
+│   └── app/src/main/res/layout/
+│       └── fragment_epc_assemble_link.xml   # 滚动优化布局
+├── 🖥️ 服务器端
+│   ├── epc-server-v365.js                 # 增强API服务器
+│   ├── epc-dashboard-v365.html            # 新版Dashboard
+│   └── status-config.json                 # 动态状态配置
+├── 📊 数据库
+│   └── database-upgrade-v364.sql          # 数据库结构（兼容v365）
+├── 🚀 部署文件
+│   ├── deploy-epc-v365.sh                 # 自动部署脚本
+│   └── DEPLOY_INSTRUCTIONS_V365.md        # 手动部署指南
+└── 📖 文档
+    ├── API_README_V365.md                 # API接口文档
+    ├── ANDROID_APP_ADJUSTMENTS_V364.md    # Android调整说明
+    ├── EPC_SYSTEM_V365_FEATURES.md        # v3.6.5功能说明
+    └── DEPLOY_README_V364.md              # 部署经验总结
 ```
 
-### Permissions
-```xml
-<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.CAMERA" />
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-```
+## 🚀 快速开始
 
-## 🌐 Server Infrastructure
+### 环境要求
 
-### EPC API Server
-- **Host**: 175.24.178.44
-- **Port**: 8082 (isolated from existing port 8081)
-- **Endpoint**: `/api/epc-assemble-link`
-- **Dashboard**: `/epc-dashboard.html`
-- **Health Check**: `/health`
+- **服务器**: Ubuntu 18.04+ / CentOS 7+
+- **Node.js**: v14.0+
+- **MySQL**: v5.7+ / v8.0+
+- **Android**: API Level 21+ (Android 5.0+)
 
-### Database Schema
-```sql
-CREATE TABLE epc_assemble_links (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    epc_id VARCHAR(50) NOT NULL,
-    assemble_id VARCHAR(100) NOT NULL,
-    rssi VARCHAR(10),
-    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    upload_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    uploaded BOOLEAN DEFAULT TRUE,
-    notes TEXT,
-    INDEX idx_epc_id (epc_id),
-    INDEX idx_assemble_id (assemble_id),
-    INDEX idx_create_time (create_time)
-);
-```
+### 部署步骤
 
-### API Endpoints
-```javascript
-// Main CRUD operations
-POST   /api/epc-assemble-link     // Create new link
-GET    /api/epc-assemble-link     // List all links
-GET    /api/epc-assemble-link/:id // Get specific link
-PUT    /api/epc-assemble-link/:id // Update link
-DELETE /api/epc-assemble-link/:id // Delete link
-
-// Statistics
-GET    /api/epc-statistics        // Dashboard data
-GET    /health                    // Server health
-```
-
-### Authentication
-```javascript
-// HTTP Basic Auth
-Username: root
-Password: Rootroot!
-
-// Request Headers
-Authorization: Basic cm9vdDpSb290cm9vdCE=
-Content-Type: application/json
-```
-
-## 🚀 Deployment Guide
-
-### Server Deployment
+1. **自动部署**（推荐）
 ```bash
-# 1. Upload files to server
-scp -r epc-server-setup.js setup-database.sql root@175.24.178.44:/opt/epc-system/
-scp epc-dashboard.html root@175.24.178.44:/opt/epc-system/
+chmod +x deploy-epc-v365.sh
+./deploy-epc-v365.sh
+```
 
-# 2. SSH to server and run setup
+2. **手动部署**
+```bash
+# 上传文件
+scp epc-server-v365.js root@175.24.178.44:/opt/epc-system-v365/
+scp epc-dashboard-v365.html root@175.24.178.44:/opt/epc-system-v365/
+
+# 在服务器上执行
 ssh root@175.24.178.44
-cd /opt/epc-system
-chmod +x deploy-server.sh
-./deploy-server.sh
-
-# 3. Verify deployment
-systemctl status epc-api-server
-curl http://175.24.178.44:8082/health
+cd /opt/epc-system-v365
+npm install express mysql2 cors
+systemctl start epc-api-server-v365
 ```
 
-### Database Setup
+### 访问地址
+
+- **Dashboard**: http://175.24.178.44:8082/epc-dashboard-v365.html
+- **API健康检查**: http://175.24.178.44:8082/health
+- **状态配置**: http://175.24.178.44:8082/api/status-config
+
+## 💡 核心功能
+
+### 🏷️ RFID标签管理
+- EPC标签识别和记录
+- 实时信号强度(RSSI)监控
+- 标签与组装件关联
+
+### 📱 多设备支持
+- **PDA设备**: UROVO等手持扫描设备
+- **PC基站**: 桌面固定扫描站
+- **移动设备**: Android移动终端
+- **自动识别**: 设备类型智能检测
+
+### 📊 实时数据分析
+- **设备统计**: 按设备类型分布分析
+- **状态统计**: 操作状态分布图表
+- **时间分析**: 24小时活动峰值监控
+- **趋势跟踪**: 每日数据趋势图
+
+### 🔧 数据管理（v3.6.5新增）
+- **📥 数据导出**: CSV格式，包含11个完整字段
+- **🗑️ 数据清空**: 双重确认的安全清理
+- **⚙️ 状态配置**: 动态管理操作状态选项
+
+### 🏗️ 建筑工业特化
+- **构件录入**: 建筑构件入库管理
+- **车间管理**: 钢构/混凝土车间进出场追踪
+- **流程状态**: 完整的建筑工艺流程状态
+
+## 🔌 API接口
+
+### 核心端点
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| POST | `/api/epc-record` | 创建EPC记录（v3.6.5推荐） |
+| GET | `/api/epc-records` | 查询EPC记录 |
+| GET | `/api/dashboard-stats` | Dashboard统计数据 |
+| GET | `/api/status-config` | 获取状态配置 |
+| POST | `/api/status-config` | 保存状态配置 |
+| DELETE | `/api/epc-records/clear` | 清空数据 |
+
+### 认证方式
+```http
+Authorization: Basic cm9vdDpSb290cm9vdCE=
+```
+
+### 示例请求
+```json
+POST /api/epc-record
+{
+  "epcId": "E200001122334455",
+  "deviceId": "PDA_UROVO_001", 
+  "statusNote": "构件录入",
+  "assembleId": "ASM001",
+  "rssi": "-45",
+  "location": "钢构车间A区"
+}
+```
+
+## 📱 Android应用
+
+### 主要功能
+- **RFID扫描**: 实时EPC标签扫描
+- **排名显示**: 信号强度前3名实时排名
+- **状态选择**: 动态加载的操作状态选项
+- **数据上传**: 支持新版本API和兼容模式
+- **OCR识别**: 组装件ID的图像识别
+
+### 新版本特性（v3.6.5）
+- **动态状态**: 从服务器自动获取状态配置
+- **滚动优化**: 解决小屏幕显示问题
+- **智能降级**: 网络异常时使用默认配置
+- **实时同步**: 状态配置变更自动同步
+
+## 🗄️ 数据库设计
+
+### 主表结构 (epc_records_v364)
 ```sql
--- Create database (if not exists)
-CREATE DATABASE IF NOT EXISTS epc_system DEFAULT CHARSET=utf8mb4;
-
--- Create user with limited permissions
-CREATE USER 'epc_user'@'localhost' IDENTIFIED BY 'SecurePass123';
-GRANT SELECT, INSERT, UPDATE, DELETE ON epc_system.* TO 'epc_user'@'localhost';
-
--- Run setup script
-SOURCE /opt/epc-system/setup-database.sql;
+- id: 记录唯一标识
+- epc_id: RFID标签ID
+- device_id: 设备标识符
+- status_note: 操作状态备注
+- assemble_id: 组装件ID
+- create_time: 创建时间
+- upload_time: 上传时间
+- rssi: 信号强度
+- device_type: 设备类型枚举
+- location: 位置信息
+- app_version: 应用版本
 ```
 
-### System Service Configuration
-```ini
-# /etc/systemd/system/epc-api-server.service
-[Unit]
-Description=EPC API Server
-After=network.target mysql.service
+### 优化视图
+- `device_activity_summary`: 设备活动汇总
+- `status_statistics`: 状态统计分析
+- `hourly_peak_analysis`: 时间峰值分析
 
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/epc-system
-ExecStart=/usr/bin/node epc-server-setup.js
-Restart=always
-RestartSec=10
+## 🛠️ 开发指南
 
-[Install]
-WantedBy=multi-user.target
-```
-
-## 📱 Android App Installation & Build
-
-### Build Instructions
+### 本地开发环境
 ```bash
-# Navigate to project directory
-cd "UHF-G_V3.6_20230821"
+# 克隆项目
+git clone <repository-url>
 
-# Clean and build (Java 8 compatible)
-./gradlew clean assembleDebug
+# 安装依赖
+npm install express mysql2 cors
 
-# For release build
-./gradlew assembleRelease
+# 配置数据库
+mysql -u root -p < database-upgrade-v364.sql
+
+# 启动开发服务器
+node epc-server-v365.js
 ```
 
-### Hardware Requirements
-- **UHF-G RFID Reader**: Compatible modules with SDK v3.6
-- **Android Device**: API 21+, 2GB+ RAM recommended
-- **Camera**: For OCR functionality (autofocus recommended)
-- **Hardware Keys**: F3/F4/F7 support (device dependent)
-
-## 💡 Usage Guide
-
-### Real-time EPC Scanning
-1. **Start Scanning**: Tap "扫描EPC" or press F3/F4/F7 hardware keys
-2. **Live Monitoring**: Watch top 3 strongest signals update in real-time
-3. **Signal Analysis**: View RSSI strength and detection counts
-4. **Tag Selection**: Auto-selects strongest signal, or manually click any rank
-5. **Continuous Operation**: Scan runs indefinitely - no time limits
-
-### Advanced Features
-- **Data Persistence**: Scan results preserved when stopping (no auto-clear)
-- **Smart Cleanup**: Clear button available for manual data reset when needed
-- **Network Monitoring**: Real-time server connectivity status
-- **Persistent Ranking**: Stop scanning maintains top 3 display for easy re-selection
-
-### Dashboard Access
-1. Open web browser
-2. Navigate to `http://175.24.178.44:8082/epc-dashboard.html`
-3. View real-time statistics and charts
-4. Export data in Excel/PDF formats
-5. Use search and filtering tools
-
-## 🛠️ Troubleshooting
-
-### Common Issues
-
-**Scan Count Not Updating**
-- ✅ **Fixed**: Continuous scanning mode now supports unlimited scans
-- ✅ **Fixed**: Real-time count accumulation without resets
-- ✅ **Fixed**: Memory protection prevents crashes with many tags
-
-**RFID Detection After Distance**
-- ✅ **Fixed**: Tags remain in history when out of range
-- ✅ **Fixed**: Automatic re-detection when tags return to range
-- ✅ **Fixed**: Continuous scanning without restart required
-
-**App Crashes with Multiple Tags**
-- ✅ **Fixed**: Memory management with 50-tag limit
-- ✅ **Fixed**: Automatic cleanup of weakest signals
-- ✅ **Fixed**: Exception handling and crash protection
-
-**Server Connection Issues**
-- Check network connectivity to 175.24.178.44:8082
-- Verify server status: `systemctl status epc-api-server`
-- Review authentication credentials
-- Check firewall settings (port 8082 access)
-
-### Debug Information
+### Android开发
 ```bash
-# Android Logs
-adb logcat | grep "EpcAssembleLink"
-
-# Server Logs
-journalctl -u epc-api-server -f
-
-# Database Logs
-mysql -u root -p -e "SELECT COUNT(*) FROM epc_system.epc_assemble_links;"
+# 打开Android Studio
+# 导入项目目录: demo/UHF-G_V3.6_20230821
+# 编译并安装到设备
+./gradlew installDebug
 ```
 
-## 📊 Performance Metrics
+## 📈 系统监控
 
-### Scanning Performance
-- **Detection Speed**: 200ms intervals, ~5 scans/second
-- **Tag Capacity**: 50 simultaneous tags with auto-cleanup
-- **Memory Usage**: Optimized with garbage collection
-- **Battery Life**: High-power scanning (level 15) - ~4 hours continuous use
+### 性能指标
+- **响应时间**: API请求 < 200ms
+- **并发支持**: 10个并发连接
+- **数据吞吐**: 支持1000条/分钟数据采集
+- **存储容量**: 支持百万级记录存储
 
-### Server Performance  
-- **Response Time**: <50ms for standard API calls
-- **Throughput**: 100+ concurrent requests supported
-- **Database**: Indexed queries for sub-10ms response times
-- **Uptime**: System service with auto-restart on failure
+### 监控命令
+```bash
+# 服务状态
+systemctl status epc-api-server-v365
 
-## 🔄 Version History
+# 实时日志
+journalctl -u epc-api-server-v365 -f
 
-### v3.6.4 (Current) - Enhanced User Selection Experience
-- ✅ **Optimized Selection Logic**: User manual selection is preserved, no auto-jump back to strongest signal
-- ✅ **Simplified Display**: Shows only current RSSI (removed maxRssi), fixed line break display issue
-- ✅ **Smart Stop Behavior**: Stop scanning preserves ranking display for continued selection
-- ✅ **Intuitive Workflow**: Start scan = reset all, stop scan = preserve selection with ranking visible
+# 数据库监控
+mysql -u epc_api_user -p epc_assemble_db_v364
+```
 
-### v3.6.3 - Real-time Scanning Revolution  
-- ✅ **Real-time Top 3 EPC Display**: Live signal strength ranking
-- ✅ **Continuous Scanning**: Unlimited scan cycles with count accumulation
-- ✅ **Advanced Memory Management**: Crash protection for 50+ tags
-- ✅ **Smart Tag Selection**: Auto-select strongest signal + manual override
-- ✅ **Signal Analytics**: RSSI values and detection frequency display
-- ✅ **Data Dashboard**: Web-based visualization with Chart.js
-- ✅ **Server Infrastructure**: Complete API server with MySQL integration
-- ✅ **Auto-deployment**: Scripted server setup with systemd services
+## 🔒 安全性
 
-### v3.6.2 - Server Integration & OCR
-- ✅ EPC-Assemble ID linking functionality
-- ✅ Google ML Kit OCR with advanced camera modes
-- ✅ Server communication via OkHttp
-- ✅ Network security configuration
-- ✅ Enhanced error handling and user feedback
+### 认证机制
+- HTTP Basic Authentication
+- API端点权限验证
+- 数据库连接加密
 
-### v3.6.1 - Core Functionality
-- ✅ Basic RFID scanning and inventory management
-- ✅ Hardware key support (F3/F4/F7)
-- ✅ Navigation and UI framework
+### 数据保护
+- 输入数据验证和过滤
+- SQL注入防护
+- 日志记录和审计
 
-## 📚 Documentation Files
+## 🚨 故障排除
 
-- `SERVER_API_DOCUMENTATION.md` - Complete API reference
-- `DEPLOYMENT_MANUAL.md` - Server setup guide  
-- `SCP_UPLOAD_COMMANDS.md` - File upload procedures
-- `ANDROID_STUDIO_TROUBLESHOOTING.md` - Build issues
-- `BUILD_CURRENT_STATUS.md` - Current build state
-- `REMOTE_DEPLOYMENT_GUIDE.md` - Production deployment
+### 常见问题
 
-## 🔒 Security Considerations
+1. **服务无法启动**
+   - 检查端口占用: `netstat -tlnp | grep 8082`
+   - 检查MySQL连接: `mysql -u epc_api_user -p`
 
-### Network Security
-- HTTP Basic Authentication for API access
-- Network security config allows cleartext to specific server
-- Database user with limited permissions (no DROP/CREATE)
-- Port isolation (8082 vs existing 8081)
+2. **Android连接失败**
+   - 验证网络连接
+   - 检查API端点URL
+   - 确认认证凭据
 
-### Data Protection
-- Local data cleared on user request
-- Server data retention with timestamp tracking  
-- Input validation and SQL injection protection
-- Error messages sanitized for production use
+3. **数据库错误**
+   - 检查用户权限: `SHOW GRANTS FOR 'epc_api_user'@'localhost'`
+   - 重新授权: `GRANT ALL PRIVILEGES ON epc_assemble_db_v364.*`
 
-## 📞 Support
+### 日志位置
+- 应用日志: `/var/log/epc-api-v365.log`
+- 错误日志: `/var/log/epc-api-v365-error.log`
+- 系统日志: `journalctl -u epc-api-server-v365`
 
-### Technical Support
-- **Server Issues**: Check `journalctl -u epc-api-server`
-- **Database Issues**: Review MySQL logs and connection status
-- **Android Issues**: Use `adb logcat` with "EpcAssembleLink" filter
-- **Hardware Issues**: Verify UHF-G module initialization
+## 📞 技术支持
 
-### Contact Information
-- **Documentation**: See included markdown files
-- **Build Issues**: Refer to `BUILD_CURRENT_STATUS.md`
-- **API Reference**: `SERVER_API_DOCUMENTATION.md`
+### 文档资源
+- [API接口文档](API_README_V365.md)
+- [Android调整说明](ANDROID_APP_ADJUSTMENTS_V364.md)
+- [v3.6.5功能说明](EPC_SYSTEM_V365_FEATURES.md)
+- [部署经验总结](DEPLOY_README_V364.md)
 
-## 📄 License
-Proprietary - UHF-G SDK License Agreement applies.
+### 联系方式
+- 问题反馈: GitHub Issues
+- 技术支持: 参考文档目录
+- 健康检查: http://175.24.178.44:8082/health
+
+## 📋 版本历史
+
+### v3.6.5 (2025-08-15) - 增强数据管理
+- ➕ 新增数据导出功能（CSV格式）
+- ➕ 新增安全数据清空功能
+- ➕ 新增动态状态配置管理
+- ➕ Android应用状态自动同步
+- 🔧 优化Dashboard用户界面
+- 🔧 改进Android布局滚动支持
+
+### v3.6.4 (2025-08-14) - 设备追踪增强
+- ➕ 新增设备ID追踪功能
+- ➕ 新增状态备注系统
+- ➕ 增强Dashboard统计分析
+- ➕ 支持多设备类型管理
+- 🔧 优化数据库性能
+- 🔧 改进API响应速度
+
+### v3.6.0 - 基础版本
+- ✅ 基础EPC-组装件关联功能
+- ✅ Android扫描应用
+- ✅ 基础Dashboard监控
+- ✅ MySQL数据存储
+
+## 📜 许可证
+
+本项目仅供学习和商业用途使用。
 
 ---
 
-**Latest Update**: January 2025 - Enhanced user selection experience with persistent manual selection, simplified RSSI display showing only current signal strength, and improved stop scanning behavior that preserves ranking display for continued selection flexibility.
-
-🚀 **Key Achievement**: Solved the "scan count freeze" and "RFID re-detection" issues with continuous scanning architecture supporting unlimited tag detection cycles and real-time signal strength analysis.
+**当前版本**: v3.6.5  
+**最后更新**: 2025-08-15  
+**维护状态**: 活跃开发中  
+**部署状态**: ✅ 生产环境运行中

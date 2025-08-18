@@ -20,10 +20,13 @@ import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -44,6 +47,7 @@ import com.uhf.api.cls.Reader;
 import com.pda.uhf_g.MainActivity;
 import com.pda.uhf_g.R;
 import com.pda.uhf_g.entity.EpcAssembleLink;
+import com.pda.uhf_g.entity.EpcRecord;
 import com.pda.uhf_g.ui.base.BaseFragment;
 import com.pda.uhf_g.util.LogUtil;
 import com.pda.uhf_g.util.UtilSound;
@@ -51,6 +55,7 @@ import com.pda.uhf_g.ui.activity.AdvancedCameraActivity;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -72,7 +77,8 @@ public class EpcAssembleLinkFragment extends BaseFragment {
     private static final int REQUEST_CAMERA_PERMISSION = 200;
     private static final int REQUEST_IMAGE_CAPTURE = 201;
     private static final int REQUEST_ADVANCED_CAMERA = 202;
-    private static final String SERVER_URL = "http://175.24.178.44:8082/api/epc-assemble-link";
+    private static final String SERVER_URL_V364 = "http://175.24.178.44:8082/api/epc-record"; // 新版本API
+    private static final String SERVER_URL = "http://175.24.178.44:8082/api/epc-assemble-link"; // 兼容旧版本
     private static final String PING_URL = "http://175.24.178.44:8082/health"; // 健康检查端点
     private static final String USERNAME = "root";
     private static final String PASSWORD = "Rootroot!";
@@ -95,6 +101,8 @@ public class EpcAssembleLinkFragment extends BaseFragment {
     TextView tvEpcRank3;
     @BindView(R.id.et_assemble_id)
     EditText etAssembleId;
+    @BindView(R.id.spinner_status)
+    Spinner spinnerStatus;
     @BindView(R.id.btn_take_photo)
     Button btnTakePhoto;
     @BindView(R.id.btn_clear_assemble)
@@ -118,10 +126,24 @@ public class EpcAssembleLinkFragment extends BaseFragment {
     private String currentRssi = "";
     private boolean userManuallySelected = false; // 用户是否手动选择过EPC
     private EpcAssembleLink currentLink;
+    private EpcRecord currentRecord; // 新版本记录对象
     private KeyReceiver keyReceiver;
     private TextRecognizer textRecognizer;
     private OkHttpClient httpClient;
     private Gson gson;
+
+    // 状态选项数组 - 改为动态加载
+    private List<String> statusOptions = new ArrayList<>();
+    private final String[] defaultStatusOptions = {
+        "完成扫描录入",
+        "构件录入", 
+        "钢构车间进场",
+        "钢构车间出场",
+        "混凝土车间进场",
+        "混凝土车间出场"
+    };
+    
+    private boolean statusOptionsLoaded = false;
 
     // 添加扫描到的标签列表和相关变量
     private List<EpcTagInfo> scannedTags = new ArrayList<>();
@@ -288,6 +310,9 @@ public class EpcAssembleLinkFragment extends BaseFragment {
         updateSummary();
         updateButtonStates();
         
+        // 先加载状态配置，然后初始化Spinner
+        loadStatusConfigFromServer();
+        
         // 启动时检查网络状态
         checkNetworkStatusOnStartup();
     }
@@ -318,6 +343,102 @@ public class EpcAssembleLinkFragment extends BaseFragment {
                 });
             }
         });
+    }
+
+    // 从服务器加载状态配置
+    private void loadStatusConfigFromServer() {
+        // 先使用默认配置初始化Spinner
+        statusOptions.clear();
+        statusOptions.addAll(Arrays.asList(defaultStatusOptions));
+        initializeSpinner();
+        
+        // 异步从服务器获取最新配置
+        Request request = new Request.Builder()
+                .url(SERVER_URL_V364.replace("/api/epc-record", "/api/status-config"))
+                .get()
+                .addHeader("Authorization", "Basic " + 
+                    android.util.Base64.encodeToString((USERNAME + ":" + PASSWORD).getBytes(), 
+                    android.util.Base64.NO_WRAP))
+                .build();
+
+        httpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                Log.w(TAG, "无法从服务器获取状态配置，使用默认配置: " + e.getMessage());
+                handler.post(() -> {
+                    statusOptionsLoaded = true;
+                    // 默认配置已经加载，无需更新
+                });
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                try {
+                    String responseBody = response.body().string();
+                    if (response.isSuccessful()) {
+                        StatusConfigResponse configResponse = gson.fromJson(responseBody, StatusConfigResponse.class);
+                        if (configResponse != null && configResponse.success && 
+                            configResponse.statuses != null && !configResponse.statuses.isEmpty()) {
+                            
+                            handler.post(() -> {
+                                // 更新状态选项
+                                statusOptions.clear();
+                                statusOptions.addAll(configResponse.statuses);
+                                
+                                // 重新初始化Spinner
+                                initializeSpinner();
+                                statusOptionsLoaded = true;
+                                
+                                Log.i(TAG, "✅ 从服务器加载状态配置成功，共" + statusOptions.size() + "个状态");
+                            });
+                        } else {
+                            Log.w(TAG, "服务器返回无效的状态配置，使用默认配置");
+                            handler.post(() -> statusOptionsLoaded = true);
+                        }
+                    } else {
+                        Log.w(TAG, "获取状态配置失败: HTTP " + response.code() + ", 使用默认配置");
+                        handler.post(() -> statusOptionsLoaded = true);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "解析状态配置失败，使用默认配置: " + e.getMessage(), e);
+                    handler.post(() -> statusOptionsLoaded = true);
+                }
+                response.close();
+            }
+        });
+    }
+
+    // 初始化状态选择Spinner
+    private void initializeSpinner() {
+        if (spinnerStatus == null || mainActivity == null) {
+            return;
+        }
+        
+        ArrayAdapter<String> statusAdapter = new ArrayAdapter<>(mainActivity, 
+            android.R.layout.simple_spinner_item, statusOptions);
+        statusAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerStatus.setAdapter(statusAdapter);
+        spinnerStatus.setSelection(0); // 默认选择第一项
+        
+        // 添加状态选择监听器
+        spinnerStatus.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                updateSummary(); // 状态改变时更新摘要
+            }
+            
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // 不做处理
+            }
+        });
+    }
+
+    // 状态配置响应实体类
+    private static class StatusConfigResponse {
+        public boolean success;
+        public List<String> statuses;
+        public String timestamp;
     }
 
     @OnClick(R.id.btn_scan_epc)
@@ -1079,17 +1200,33 @@ public class EpcAssembleLinkFragment extends BaseFragment {
 
     private void createLinkAndUpload() {
         String assembleId = etAssembleId.getText().toString().trim();
+        String selectedStatus = spinnerStatus.getSelectedItem().toString();
+        
+        // 创建新版本EPC记录
+        currentRecord = new EpcRecord(currentEpcId, assembleId, selectedStatus);
+        currentRecord.setRssi(currentRssi);
+        currentRecord.setAssembleId(assembleId);
+        
+        // 兼容旧版本
         currentLink = new EpcAssembleLink(currentEpcId, assembleId);
         currentLink.setRssi(currentRssi);
         
         tvUploadStatus.setText(getString(R.string.uploading_to_server));
         progressUpload.setVisibility(View.VISIBLE);
         
-        uploadToServer(currentLink);
+        uploadToServerV364(currentRecord);
     }
 
     private void createLinkAndSaveLocal() {
         String assembleId = etAssembleId.getText().toString().trim();
+        String selectedStatus = spinnerStatus.getSelectedItem().toString();
+        
+        // 创建新版本EPC记录
+        currentRecord = new EpcRecord(currentEpcId, assembleId, selectedStatus + " (本地保存)");
+        currentRecord.setRssi(currentRssi);
+        currentRecord.setAssembleId(assembleId);
+        
+        // 兼容旧版本
         currentLink = new EpcAssembleLink(currentEpcId, assembleId);
         currentLink.setRssi(currentRssi);
         currentLink.setUploaded(false);
@@ -1101,6 +1238,74 @@ public class EpcAssembleLinkFragment extends BaseFragment {
         resetForm();
     }
 
+    private void uploadToServerV364(EpcRecord record) {
+        // 首先检查网络连通性
+        tvUploadStatus.setText("检查服务器连通性...");
+        progressUpload.setVisibility(View.VISIBLE);
+        
+        checkServerConnectivity(() -> {
+            // 网络可达，执行实际上传
+            performUploadV364(record);
+        }, (error) -> {
+            // 网络不可达，尝试使用旧版本API作为备用
+            Log.w(TAG, "v3.6.4 API连接失败，尝试使用兼容模式: " + error);
+            uploadToServer(currentLink);
+        });
+    }
+    
+    private void performUploadV364(EpcRecord record) {
+        tvUploadStatus.setText("上传到服务器 (v3.6.4)...");
+        
+        String json = gson.toJson(record);
+        
+        RequestBody body = RequestBody.create(json, MediaType.get("application/json; charset=utf-8"));
+        
+        Request request = new Request.Builder()
+                .url(SERVER_URL_V364)
+                .post(body)
+                .addHeader("Authorization", "Basic " + 
+                    android.util.Base64.encodeToString((USERNAME + ":" + PASSWORD).getBytes(), 
+                    android.util.Base64.NO_WRAP))
+                .addHeader("Content-Type", "application/json")
+                .addHeader("User-Agent", "UHF-G Android App v3.6.4")
+                .build();
+
+        httpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                handler.post(() -> {
+                    progressUpload.setVisibility(View.GONE);
+                    String errorDetail = analyzeNetworkError(e);
+                    tvUploadStatus.setText("v3.6.4上传失败，尝试兼容模式...");
+                    Log.e(TAG, "v3.6.4 Upload failed, falling back to legacy API", e);
+                    
+                    // 回退到旧版本API
+                    uploadToServer(currentLink);
+                });
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                handler.post(() -> {
+                    progressUpload.setVisibility(View.GONE);
+                    if (response.isSuccessful()) {
+                        tvUploadStatus.setText("上传成功 (v3.6.4增强版)");
+                        showToast("✅ 数据已上传到增强版服务器");
+                        resetForm();
+                        
+                        Log.i(TAG, "✅ 成功上传到v3.6.4服务器: EPC=" + record.getEpcId() + 
+                              ", Device=" + record.getDeviceId() + ", Status=" + record.getStatusNote());
+                    } else {
+                        tvUploadStatus.setText("服务器错误 (v3.6.4): HTTP " + response.code());
+                        showToast("❌ 服务器错误: " + response.code());
+                        Log.e(TAG, "v3.6.4服务器错误: " + response.code());
+                    }
+                });
+                response.close();
+            }
+        });
+    }
+    
     private void uploadToServer(EpcAssembleLink link) {
         // 首先检查网络连通性
         tvUploadStatus.setText(getString(R.string.checking_server_connectivity));
@@ -1213,23 +1418,35 @@ public class EpcAssembleLinkFragment extends BaseFragment {
         currentEpcId = "";
         currentRssi = "";
         currentLink = null;
+        currentRecord = null; // 清理新版本记录对象
         tvScannedEpc.setText(getString(R.string.no_epc_scanned));
         etAssembleId.setText("");
+        
+        // 重置状态选择器到默认值
+        if (spinnerStatus != null) {
+            spinnerStatus.setSelection(0);
+        }
+        
         updateSummary();
         updateButtonStates();
     }
 
     private void updateSummary() {
         String assembleId = etAssembleId.getText().toString().trim();
+        String selectedStatus = "";
+        
+        if (spinnerStatus != null && spinnerStatus.getSelectedItem() != null) {
+            selectedStatus = spinnerStatus.getSelectedItem().toString();
+        }
         
         if (TextUtils.isEmpty(currentEpcId) && TextUtils.isEmpty(assembleId)) {
             tvLinkSummary.setText(getString(R.string.please_scan_epc_and_enter_assemble));
         } else if (TextUtils.isEmpty(currentEpcId)) {
-            tvLinkSummary.setText(getString(R.string.assemble_id_with_colon) + assembleId + "\n" + getString(R.string.please_enter_assemble_id));
+            tvLinkSummary.setText(getString(R.string.assemble_id_with_colon) + assembleId + "\n状态: " + selectedStatus + "\n" + getString(R.string.please_enter_assemble_id));
         } else if (TextUtils.isEmpty(assembleId)) {
-            tvLinkSummary.setText(getString(R.string.epc_with_colon) + currentEpcId + "\n" + getString(R.string.please_enter_assemble_id));
+            tvLinkSummary.setText(getString(R.string.epc_with_colon) + currentEpcId + "\n状态: " + selectedStatus + "\n" + getString(R.string.please_enter_assemble_id));
         } else {
-            tvLinkSummary.setText(getString(R.string.epc_with_colon) + currentEpcId + "\n" + getString(R.string.assemble_id_with_colon) + assembleId + "\n" + getString(R.string.ready_to_upload));
+            tvLinkSummary.setText(getString(R.string.epc_with_colon) + currentEpcId + "\n" + getString(R.string.assemble_id_with_colon) + assembleId + "\n状态: " + selectedStatus + "\n" + getString(R.string.ready_to_upload));
         }
     }
 

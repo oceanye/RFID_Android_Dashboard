@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPC数据监控台 v3.6.4 - 设备追踪与状态分析</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .control-group select,
+        .control-group input {
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 新增按钮样式 */
+        .action-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+            margin: 0 5px;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .action-btn.danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+
+        .action-btn.warning {
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
+        }
+
+        .action-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 状态配置模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .status-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+
+        .remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .add-status-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .stats-overview {
+            padding: 30px;
+            background: white;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .charts-section {
+            padding: 0 30px 30px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #495057;
+            text-align: center;
+        }
+
+        .chart-canvas {
+            max-height: 300px;
+        }
+
+        .wide-chart {
+            grid-column: 1 / -1;
+        }
+
+        .data-tables {
+            padding: 0 30px 30px;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            font-weight: 600;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th,
+        .table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .device-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .device-pda { background: #e3f2fd; color: #1976d2; }
+        .device-pc { background: #f3e5f5; color: #7b1fa2; }
+        .device-station { background: #e8f5e8; color: #388e3c; }
+        .device-mobile { background: #fff3e0; color: #f57c00; }
+        .device-other { background: #fafafa; color: #616161; }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 600;
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px;
+            border: 1px solid #f5c6cb;
+        }
+
+        .last-updated {
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9em;
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .control-group {
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>📊 EPC数据监控台 v3.6.4</h1>
+            <p>🔍 设备追踪 • 📈 状态分析 • ⏰ 峰值监控 • 📱 多设备支持</p>
+        </div>
+
+        <!-- 控制面板 -->
+        <div class="controls">
+            <div class="control-group">
+                <label for="periodSelect">📅 统计周期:</label>
+                <select id="periodSelect">
+                    <option value="1">最近1天</option>
+                    <option value="3">最近3天</option>
+                    <option value="7" selected>最近7天</option>
+                    <option value="14">最近14天</option>
+                    <option value="30">最近30天</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="autoRefresh">🔄 自动刷新:</label>
+                <select id="autoRefresh">
+                    <option value="0">手动</option>
+                    <option value="30000" selected>30秒</option>
+                    <option value="60000">1分钟</option>
+                    <option value="300000">5分钟</option>
+                </select>
+            </div>
+            
+            <button id="refreshBtn" class="refresh-btn">🔄 立即刷新</button>
+            
+            <!-- 新增功能按钮 -->
+            <div class="control-group">
+                <button id="exportBtn" class="action-btn">📥 导出数据</button>
+                <button id="clearBtn" class="action-btn danger">🗑️ 清空数据</button>
+                <button id="statusConfigBtn" class="action-btn warning">⚙️ 状态配置</button>
+            </div>
+        </div>
+
+        <!-- 状态配置模态框 -->
+        <div id="statusModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>📝 状态配置管理</h2>
+                    <span class="close">&times;</span>
+                </div>
+                <div id="statusList">
+                    <!-- 状态列表将通过JavaScript动态生成 -->
+                </div>
+                <button id="addStatusBtn" class="add-status-btn">➕ 添加新状态</button>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button id="saveStatusBtn" class="action-btn">💾 保存配置</button>
+                    <button id="cancelStatusBtn" class="action-btn" style="background: #6c757d;">❌ 取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计概览 -->
+        <div class="stats-overview">
+            <div class="stats-grid" id="statsGrid">
+                <!-- 统计卡片将通过JavaScript动态生成 -->
+            </div>
+        </div>
+
+        <!-- 图表区域 -->
+        <div class="charts-section">
+            <div class="charts-grid">
+                <!-- 设备统计图 -->
+                <div class="chart-container">
+                    <h3 class="chart-title">📱 设备类型分布</h3>
+                    <canvas id="deviceTypeChart" class="chart-canvas"></canvas>
+                </div>
+
+                <!-- 状态统计图 -->
+                <div class="chart-container">
+                    <h3 class="chart-title">📝 操作状态分布</h3>
+                    <canvas id="statusChart" class="chart-canvas"></canvas>
+                </div>
+
+                <!-- 时间峰值图 -->
+                <div class="chart-container wide-chart">
+                    <h3 class="chart-title">⏰ 24小时活动峰值分析</h3>
+                    <canvas id="hourlyChart" class="chart-canvas"></canvas>
+                </div>
+
+                <!-- 每日趋势图 -->
+                <div class="chart-container wide-chart">
+                    <h3 class="chart-title">📈 每日数据趋势</h3>
+                    <canvas id="dailyTrendChart" class="chart-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据表格 -->
+        <div class="data-tables">
+            <!-- 设备统计表 -->
+            <div class="table-container">
+                <div class="table-header">📱 设备活动统计</div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>设备ID</th>
+                            <th>设备类型</th>
+                            <th>总记录数</th>
+                            <th>唯一EPC数</th>
+                            <th>最后活动</th>
+                        </tr>
+                    </thead>
+                    <tbody id="deviceTableBody">
+                        <!-- 数据行将通过JavaScript动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 状态统计表 -->
+            <div class="table-container">
+                <div class="table-header">📝 操作状态统计</div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>状态/备注</th>
+                            <th>记录数量</th>
+                            <th>涉及设备数</th>
+                            <th>唯一EPC数</th>
+                            <th>占比</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statusTableBody">
+                        <!-- 数据行将通过JavaScript动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 最后更新时间 -->
+        <div class="last-updated" id="lastUpdated">
+            正在加载数据...
+        </div>
+    </div>
+
+    <script>
+        class EpcDashboard {
+            constructor() {
+                this.charts = {};
+                this.refreshInterval = null;
+                this.isLoading = false;
+                this.apiBase = window.location.origin;
+                this.currentStatuses = [
+                    '完成扫描录入',
+                    '构件录入', 
+                    '钢构车间进场',
+                    '钢构车间出场',
+                    '混凝土车间进场',
+                    '混凝土车间出场'
+                ];
+                
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.loadData();
+                this.setupAutoRefresh();
+            }
+
+            setupEventListeners() {
+                document.getElementById('refreshBtn').addEventListener('click', () => {
+                    this.loadData();
+                });
+
+                document.getElementById('periodSelect').addEventListener('change', () => {
+                    this.loadData();
+                });
+
+                document.getElementById('autoRefresh').addEventListener('change', () => {
+                    this.setupAutoRefresh();
+                });
+
+                // 新增功能按钮事件监听器
+                document.getElementById('exportBtn').addEventListener('click', () => {
+                    this.exportData();
+                });
+
+                document.getElementById('clearBtn').addEventListener('click', () => {
+                    this.clearData();
+                });
+
+                document.getElementById('statusConfigBtn').addEventListener('click', () => {
+                    this.openStatusConfig();
+                });
+
+                // 状态配置模态框事件
+                document.querySelector('.close').addEventListener('click', () => {
+                    this.closeStatusConfig();
+                });
+
+                document.getElementById('addStatusBtn').addEventListener('click', () => {
+                    this.addStatusInput();
+                });
+
+                document.getElementById('saveStatusBtn').addEventListener('click', () => {
+                    this.saveStatusConfig();
+                });
+
+                document.getElementById('cancelStatusBtn').addEventListener('click', () => {
+                    this.closeStatusConfig();
+                });
+
+                // 点击模态框外部关闭
+                window.addEventListener('click', (event) => {
+                    const modal = document.getElementById('statusModal');
+                    if (event.target === modal) {
+                        this.closeStatusConfig();
+                    }
+                });
+            }
+
+            setupAutoRefresh() {
+                if (this.refreshInterval) {
+                    clearInterval(this.refreshInterval);
+                }
+
+                const interval = parseInt(document.getElementById('autoRefresh').value);
+                if (interval > 0) {
+                    this.refreshInterval = setInterval(() => {
+                        this.loadData();
+                    }, interval);
+                }
+            }
+
+            async loadData() {
+                if (this.isLoading) return;
+                
+                this.isLoading = true;
+                this.setLoadingState(true);
+
+                try {
+                    const days = document.getElementById('periodSelect').value;
+                    const response = await axios.get(`${this.apiBase}/api/dashboard-stats?days=${days}`);
+                    
+                    if (response.data.success) {
+                        this.renderDashboard(response.data.data);
+                        this.updateLastUpdated(response.data.generated_at);
+                    } else {
+                        throw new Error(response.data.message || '数据加载失败');
+                    }
+                } catch (error) {
+                    console.error('Dashboard数据加载失败:', error);
+                    this.showError('数据加载失败: ' + error.message);
+                } finally {
+                    this.isLoading = false;
+                    this.setLoadingState(false);
+                }
+            }
+
+            setLoadingState(loading) {
+                const refreshBtn = document.getElementById('refreshBtn');
+                refreshBtn.disabled = loading;
+                refreshBtn.textContent = loading ? '🔄 加载中...' : '🔄 立即刷新';
+            }
+
+            renderDashboard(data) {
+                this.renderStatsOverview(data.overview);
+                this.renderDeviceChart(data.device_statistics);
+                this.renderStatusChart(data.status_statistics);
+                this.renderHourlyChart(data.hourly_peak_analysis);
+                this.renderDailyTrendChart(data.daily_trend);
+                this.renderDeviceTable(data.device_statistics);
+                this.renderStatusTable(data.status_statistics);
+            }
+
+            renderStatsOverview(overview) {
+                const statsGrid = document.getElementById('statsGrid');
+                const stats = [
+                    { label: '总记录数', value: overview.total_records, icon: '📊' },
+                    { label: '唯一EPC数', value: overview.total_unique_epcs, icon: '🏷️' },
+                    { label: '活跃设备数', value: overview.total_devices, icon: '📱' },
+                    { label: '状态类型数', value: overview.total_status_types, icon: '📝' },
+                    { label: '数据时间范围', value: this.formatDateRange(overview.first_record, overview.latest_record), icon: '📅' }
+                ];
+
+                statsGrid.innerHTML = stats.map(stat => `
+                    <div class="stat-card">
+                        <span class="stat-value">${stat.icon} ${stat.value}</span>
+                        <div class="stat-label">${stat.label}</div>
+                    </div>
+                `).join('');
+            }
+
+            renderDeviceChart(deviceStats) {
+                const ctx = document.getElementById('deviceTypeChart').getContext('2d');
+                
+                if (this.charts.deviceType) {
+                    this.charts.deviceType.destroy();
+                }
+
+                const deviceTypes = [...new Set(deviceStats.map(d => d.device_type))];
+                const colors = {
+                    'PDA': '#2196F3',
+                    'PC': '#9C27B0',
+                    'STATION': '#4CAF50',
+                    'MOBILE': '#FF9800',
+                    'OTHER': '#757575'
+                };
+
+                const data = deviceTypes.map(type => {
+                    return deviceStats
+                        .filter(d => d.device_type === type)
+                        .reduce((sum, d) => sum + d.total_records, 0);
+                });
+
+                this.charts.deviceType = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: deviceTypes,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: deviceTypes.map(type => colors[type] || '#757575'),
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+
+            renderStatusChart(statusStats) {
+                const ctx = document.getElementById('statusChart').getContext('2d');
+                
+                if (this.charts.status) {
+                    this.charts.status.destroy();
+                }
+
+                const topStatuses = statusStats.slice(0, 8); // 显示前8个状态
+
+                this.charts.status = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: topStatuses.map(s => s.status_note.length > 15 ? 
+                            s.status_note.substring(0, 15) + '...' : s.status_note),
+                        datasets: [{
+                            label: '记录数量',
+                            data: topStatuses.map(s => s.count),
+                            backgroundColor: '#667eea',
+                            borderColor: '#5a6fd8',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+
+            renderHourlyChart(hourlyStats) {
+                const ctx = document.getElementById('hourlyChart').getContext('2d');
+                
+                if (this.charts.hourly) {
+                    this.charts.hourly.destroy();
+                }
+
+                // 确保有24小时的完整数据
+                const hourlyData = Array.from({length: 24}, (_, hour) => {
+                    const found = hourlyStats.find(h => h.hour === hour);
+                    return found ? found.record_count : 0;
+                });
+
+                const deviceData = Array.from({length: 24}, (_, hour) => {
+                    const found = hourlyStats.find(h => h.hour === hour);
+                    return found ? found.active_devices : 0;
+                });
+
+                this.charts.hourly = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                        datasets: [{
+                            label: '记录数量',
+                            data: hourlyData,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }, {
+                            label: '活跃设备数',
+                            data: deviceData,
+                            borderColor: '#764ba2',
+                            backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            }
+                        }
+                    }
+                });
+            }
+
+            renderDailyTrendChart(dailyTrend) {
+                const ctx = document.getElementById('dailyTrendChart').getContext('2d');
+                
+                if (this.charts.dailyTrend) {
+                    this.charts.dailyTrend.destroy();
+                }
+
+                this.charts.dailyTrend = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dailyTrend.map(d => new Date(d.date).toLocaleDateString()),
+                        datasets: [{
+                            label: '每日记录数',
+                            data: dailyTrend.map(d => d.record_count),
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }, {
+                            label: '活跃设备数',
+                            data: dailyTrend.map(d => d.active_devices),
+                            borderColor: '#764ba2',
+                            backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }, {
+                            label: '唯一EPC数',
+                            data: dailyTrend.map(d => d.unique_epcs),
+                            borderColor: '#4CAF50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            }
+                        }
+                    }
+                });
+            }
+
+            renderDeviceTable(deviceStats) {
+                const tbody = document.getElementById('deviceTableBody');
+                tbody.innerHTML = deviceStats.map(device => `
+                    <tr>
+                        <td>${device.device_id}</td>
+                        <td>
+                            <span class="device-badge device-${device.device_type.toLowerCase()}">
+                                ${device.device_type}
+                            </span>
+                        </td>
+                        <td>${device.total_records.toLocaleString()}</td>
+                        <td>${device.unique_epcs.toLocaleString()}</td>
+                        <td>${new Date(device.last_activity_time).toLocaleString()}</td>
+                    </tr>
+                `).join('');
+            }
+
+            renderStatusTable(statusStats) {
+                const tbody = document.getElementById('statusTableBody');
+                const totalRecords = statusStats.reduce((sum, s) => sum + s.count, 0);
+                
+                tbody.innerHTML = statusStats.map(status => `
+                    <tr>
+                        <td>
+                            <span class="status-badge">${status.status_note}</span>
+                        </td>
+                        <td>${status.count.toLocaleString()}</td>
+                        <td>${status.device_count}</td>
+                        <td>${status.unique_epcs}</td>
+                        <td>${((status.count / totalRecords) * 100).toFixed(1)}%</td>
+                    </tr>
+                `).join('');
+            }
+
+            formatDateRange(first, latest) {
+                if (!first || !latest) return 'N/A';
+                const firstDate = new Date(first).toLocaleDateString();
+                const latestDate = new Date(latest).toLocaleDateString();
+                return firstDate === latestDate ? firstDate : `${firstDate} - ${latestDate}`;
+            }
+
+            updateLastUpdated(timestamp) {
+                const lastUpdated = document.getElementById('lastUpdated');
+                lastUpdated.textContent = `📅 最后更新: ${new Date(timestamp).toLocaleString()}`;
+            }
+
+            showError(message) {
+                const container = document.querySelector('.container');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error';
+                errorDiv.textContent = message;
+                container.appendChild(errorDiv);
+                
+                setTimeout(() => {
+                    errorDiv.remove();
+                }, 5000);
+            }
+
+            // 导出数据功能
+            async exportData() {
+                try {
+                    const response = await axios.get(`${this.apiBase}/api/epc-records`, {
+                        params: { limit: 10000 }, // 导出大量数据
+                        headers: {
+                            'Authorization': 'Basic cm9vdDpSb290cm9vdCE='
+                        }
+                    });
+
+                    if (response.data && response.data.success) {
+                        this.downloadAsCSV(response.data.data);
+                        this.showSuccess('数据导出成功！');
+                    } else {
+                        throw new Error('获取数据失败');
+                    }
+                } catch (error) {
+                    console.error('导出数据失败:', error);
+                    this.showError('导出数据失败: ' + error.message);
+                }
+            }
+
+            // 下载CSV文件
+            downloadAsCSV(data) {
+                const headers = ['ID', 'EPC ID', '设备ID', '状态备注', '组装件ID', '创建时间', '上传时间', 'RSSI', '设备类型', '位置', '应用版本'];
+                const csvContent = [
+                    headers.join(','),
+                    ...data.map(row => [
+                        row.id,
+                        `"${row.epc_id}"`,
+                        `"${row.device_id}"`,
+                        `"${row.status_note}"`,
+                        `"${row.assemble_id || ''}"`,
+                        `"${row.create_time}"`,
+                        `"${row.upload_time}"`,
+                        `"${row.rssi || ''}"`,
+                        `"${row.device_type || ''}"`,
+                        `"${row.location || ''}"`,
+                        `"${row.app_version || ''}"`
+                    ].join(','))
+                ].join('\n');
+
+                const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `epc_data_${new Date().toISOString().split('T')[0]}.csv`;
+                link.click();
+            }
+
+            // 清空数据功能
+            async clearData() {
+                if (!confirm('⚠️ 警告：此操作将清空所有EPC记录数据，且无法恢复！\n\n确定要继续吗？')) {
+                    return;
+                }
+
+                if (!confirm('⚠️ 最后确认：这将永久删除所有数据！\n\n请再次确认您要清空所有数据？')) {
+                    return;
+                }
+
+                try {
+                    const response = await axios.delete(`${this.apiBase}/api/epc-records/clear`, {
+                        headers: {
+                            'Authorization': 'Basic cm9vdDpSb290cm9vdCE='
+                        }
+                    });
+
+                    if (response.data && response.data.success) {
+                        this.showSuccess('数据清空成功！页面将自动刷新...');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                    } else {
+                        throw new Error('清空数据失败');
+                    }
+                } catch (error) {
+                    console.error('清空数据失败:', error);
+                    this.showError('清空数据失败: ' + error.message);
+                }
+            }
+
+            // 打开状态配置对话框
+            async openStatusConfig() {
+                try {
+                    // 从服务器获取当前状态配置
+                    const response = await axios.get(`${this.apiBase}/api/status-config`, {
+                        headers: {
+                            'Authorization': 'Basic cm9vdDpSb290cm9vdCE='
+                        }
+                    });
+
+                    if (response.data && response.data.success) {
+                        this.currentStatuses = response.data.statuses;
+                    }
+                } catch (error) {
+                    console.log('使用默认状态配置');
+                }
+
+                this.renderStatusList();
+                document.getElementById('statusModal').style.display = 'block';
+            }
+
+            // 关闭状态配置对话框
+            closeStatusConfig() {
+                document.getElementById('statusModal').style.display = 'none';
+            }
+
+            // 渲染状态列表
+            renderStatusList() {
+                const statusList = document.getElementById('statusList');
+                statusList.innerHTML = '';
+
+                this.currentStatuses.forEach((status, index) => {
+                    const statusDiv = document.createElement('div');
+                    statusDiv.className = 'status-item';
+                    statusDiv.innerHTML = `
+                        <input type="text" class="status-input" value="${status}" data-index="${index}">
+                        <button class="remove-btn" onclick="dashboard.removeStatus(${index})">删除</button>
+                    `;
+                    statusList.appendChild(statusDiv);
+                });
+            }
+
+            // 添加新状态输入框
+            addStatusInput() {
+                this.currentStatuses.push('');
+                this.renderStatusList();
+            }
+
+            // 删除状态
+            removeStatus(index) {
+                if (this.currentStatuses.length <= 1) {
+                    alert('至少需要保留一个状态选项！');
+                    return;
+                }
+                this.currentStatuses.splice(index, 1);
+                this.renderStatusList();
+            }
+
+            // 保存状态配置
+            async saveStatusConfig() {
+                // 收集所有输入框的值
+                const inputs = document.querySelectorAll('.status-input');
+                const newStatuses = Array.from(inputs)
+                    .map(input => input.value.trim())
+                    .filter(status => status.length > 0);
+
+                if (newStatuses.length === 0) {
+                    alert('至少需要一个有效的状态选项！');
+                    return;
+                }
+
+                try {
+                    const response = await axios.post(`${this.apiBase}/api/status-config`, {
+                        statuses: newStatuses
+                    }, {
+                        headers: {
+                            'Authorization': 'Basic cm9vdDpSb290cm9vdCE=',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.data && response.data.success) {
+                        this.currentStatuses = newStatuses;
+                        this.closeStatusConfig();
+                        this.showSuccess('状态配置保存成功！');
+                    } else {
+                        throw new Error('保存状态配置失败');
+                    }
+                } catch (error) {
+                    console.error('保存状态配置失败:', error);
+                    this.showError('保存状态配置失败: ' + error.message);
+                }
+            }
+
+            // 显示成功消息
+            showSuccess(message) {
+                const container = document.querySelector('.container');
+                const successDiv = document.createElement('div');
+                successDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #28a745;
+                    color: white;
+                    padding: 15px 20px;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    z-index: 1001;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                `;
+                successDiv.textContent = message;
+                container.appendChild(successDiv);
+                
+                setTimeout(() => {
+                    successDiv.remove();
+                }, 5000);
+            }
+        }
+
+        // 全局dashboard实例引用
+        let dashboard;
+
+        // 初始化Dashboard
+        document.addEventListener('DOMContentLoaded', () => {
+            dashboard = new EpcDashboard();
+        });
+    </script>
+</body>
+</html>
