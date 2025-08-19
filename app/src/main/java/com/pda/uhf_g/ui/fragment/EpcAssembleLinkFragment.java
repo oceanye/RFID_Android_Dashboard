@@ -1121,7 +1121,21 @@ public class EpcAssembleLinkFragment extends BaseFragment {
     }
 
     private void processImageWithOCR(Bitmap bitmap) {
-        InputImage image = InputImage.fromBitmap(bitmap, 0);
+        if (bitmap == null) {
+            tvUploadStatus.setText("图片为空，无法进行OCR识别");
+            showToast("图片为空，请重新拍照");
+            return;
+        }
+        
+        // 记录图片信息用于调试
+        Log.d(TAG, "开始OCR处理 - 图片尺寸: " + bitmap.getWidth() + "x" + bitmap.getHeight() + 
+                   ", 格式: " + bitmap.getConfig());
+        
+        // 图像预处理以提高OCR精度
+        Bitmap processedBitmap = preprocessImageForOCR(bitmap);
+        Log.d(TAG, "预处理后图片尺寸: " + processedBitmap.getWidth() + "x" + processedBitmap.getHeight());
+        
+        InputImage image = InputImage.fromBitmap(processedBitmap, 0);
         
         tvUploadStatus.setText(getString(R.string.processing_image_with_ocr));
         progressUpload.setVisibility(View.VISIBLE);
@@ -1129,37 +1143,292 @@ public class EpcAssembleLinkFragment extends BaseFragment {
         textRecognizer.process(image)
                 .addOnSuccessListener(visionText -> {
                     progressUpload.setVisibility(View.GONE);
+                    
+                    // 详细的OCR结果日志
+                    String fullText = visionText.getText();
+                    Log.d(TAG, "OCR识别完成 - 原始文本: '" + fullText + "'");
+                    Log.d(TAG, "OCR识别完成 - 文本长度: " + fullText.length());
+                    
+                    // 记录所有文本块
+                    List<Text.TextBlock> textBlocks = visionText.getTextBlocks();
+                    Log.d(TAG, "检测到 " + textBlocks.size() + " 个文本块:");
+                    for (int i = 0; i < textBlocks.size(); i++) {
+                        Text.TextBlock block = textBlocks.get(i);
+                        Log.d(TAG, "  文本块 " + (i+1) + ": '" + block.getText() + "'");
+                        
+                        // 记录每行文本
+                        List<Text.Line> lines = block.getLines();
+                        for (int j = 0; j < lines.size(); j++) {
+                            Text.Line line = lines.get(j);
+                            Log.d(TAG, "    行 " + (j+1) + ": '" + line.getText() + "'");
+                        }
+                    }
+                    
                     String recognizedText = extractAssembleId(visionText);
+                    Log.d(TAG, "提取的组装件ID: '" + recognizedText + "'");
+                    
                     if (!TextUtils.isEmpty(recognizedText)) {
                         etAssembleId.setText(recognizedText);
-                        tvUploadStatus.setText(getString(R.string.ocr_completed_successfully));
+                        tvUploadStatus.setText("OCR识别成功: " + recognizedText);
                         updateSummary();
                         updateButtonStates();
+                        showToast("OCR识别成功: " + recognizedText);
                     } else {
-                        tvUploadStatus.setText(getString(R.string.no_text_recognized_from_image));
+                        tvUploadStatus.setText("OCR未识别到有效文字，请检查图片质量或重新拍照");
+                        showToast("未识别到文字，请重新拍照");
+                        
+                        // 如果有原始文本但提取失败，显示原始文本供用户参考
+                        if (!TextUtils.isEmpty(fullText)) {
+                            Log.w(TAG, "OCR识别到文字但提取失败，原始文本: " + fullText);
+                            // 显示一个对话框让用户看到识别的原始文本
+                            showOcrResultDialog(fullText);
+                        }
+                    }
+                    
+                    // 释放预处理图片内存（如果不是原图的话）
+                    if (processedBitmap != bitmap && !processedBitmap.isRecycled()) {
+                        processedBitmap.recycle();
                     }
                 })
                 .addOnFailureListener(e -> {
                     progressUpload.setVisibility(View.GONE);
-                    tvUploadStatus.setText(getString(R.string.ocr_processing_failed));
-                    showToast(getString(R.string.failed_to_process_image) + e.getMessage());
+                    tvUploadStatus.setText("OCR识别失败: " + e.getMessage());
+                    Log.e(TAG, "OCR识别失败", e);
+                    showToast("OCR识别失败: " + e.getMessage());
+                    
+                    // 释放预处理图片内存
+                    if (processedBitmap != bitmap && !processedBitmap.isRecycled()) {
+                        processedBitmap.recycle();
+                    }
                 });
+    }
+    
+    /**
+     * 图像预处理以提高OCR识别精度
+     */
+    private Bitmap preprocessImageForOCR(Bitmap originalBitmap) {
+        if (originalBitmap == null || originalBitmap.isRecycled()) {
+            return originalBitmap;
+        }
+        
+        try {
+            Bitmap processedBitmap = originalBitmap;
+            
+            // 1. 确保图片有足够的分辨率进行OCR
+            int minDimension = 300;  // 最小维度
+            int maxDimension = 1024; // 最大维度，避免内存问题
+            
+            int width = processedBitmap.getWidth();
+            int height = processedBitmap.getHeight();
+            
+            // 如果图片太小，放大到合适尺寸
+            if (width < minDimension || height < minDimension) {
+                float scaleFactor = Math.max(
+                    (float) minDimension / width, 
+                    (float) minDimension / height
+                );
+                
+                int newWidth = (int) (width * scaleFactor);
+                int newHeight = (int) (height * scaleFactor);
+                
+                Log.d(TAG, "图片太小，放大: " + width + "x" + height + " -> " + newWidth + "x" + newHeight);
+                
+                Bitmap scaledBitmap = Bitmap.createScaledBitmap(processedBitmap, newWidth, newHeight, true);
+                if (scaledBitmap != processedBitmap && processedBitmap != originalBitmap) {
+                    processedBitmap.recycle();
+                }
+                processedBitmap = scaledBitmap;
+                width = newWidth;
+                height = newHeight;
+            }
+            
+            // 如果图片太大，缩小到合适尺寸
+            else if (width > maxDimension || height > maxDimension) {
+                float scaleFactor = Math.min(
+                    (float) maxDimension / width, 
+                    (float) maxDimension / height
+                );
+                
+                int newWidth = (int) (width * scaleFactor);
+                int newHeight = (int) (height * scaleFactor);
+                
+                Log.d(TAG, "图片太大，缩小: " + width + "x" + height + " -> " + newWidth + "x" + newHeight);
+                
+                Bitmap scaledBitmap = Bitmap.createScaledBitmap(processedBitmap, newWidth, newHeight, true);
+                if (scaledBitmap != processedBitmap && processedBitmap != originalBitmap) {
+                    processedBitmap.recycle();
+                }
+                processedBitmap = scaledBitmap;
+            }
+            
+            Log.d(TAG, "预处理完成，最终尺寸: " + processedBitmap.getWidth() + "x" + processedBitmap.getHeight());
+            return processedBitmap;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "图片预处理失败，使用原图: " + e.getMessage(), e);
+            return originalBitmap;
+        }
     }
 
     private String extractAssembleId(Text visionText) {
         String fullText = visionText.getText();
         
-        // Simple extraction - you can enhance this based on your specific format
+        // 如果没有识别到任何文字
+        if (TextUtils.isEmpty(fullText)) {
+            Log.w(TAG, "OCR未识别到任何文字");
+            return "";
+        }
+        
+        // 增强版文本提取逻辑
+        List<String> candidates = new ArrayList<>();
+        
+        // 方法1：按行处理
         String[] lines = fullText.split("\n");
         for (String line : lines) {
             line = line.trim();
             if (line.length() > 0) {
-                // Return first non-empty line as assemble ID
-                // You can add more sophisticated parsing here
-                return line;
+                candidates.add(line);
+                Log.d(TAG, "候选文本(按行): '" + line + "'");
             }
         }
-        return "";
+        
+        // 方法2：处理文本块
+        List<Text.TextBlock> textBlocks = visionText.getTextBlocks();
+        for (Text.TextBlock block : textBlocks) {
+            String blockText = block.getText().trim();
+            if (!TextUtils.isEmpty(blockText)) {
+                candidates.add(blockText);
+                Log.d(TAG, "候选文本(文本块): '" + blockText + "'");
+            }
+        }
+        
+        // 方法3：处理单个元素
+        List<Text.Line> allLines = new ArrayList<>();
+        for (Text.TextBlock block : textBlocks) {
+            allLines.addAll(block.getLines());
+        }
+        
+        for (Text.Line line : allLines) {
+            String lineText = line.getText().trim();
+            if (!TextUtils.isEmpty(lineText)) {
+                candidates.add(lineText);
+                Log.d(TAG, "候选文本(单行): '" + lineText + "'");
+            }
+        }
+        
+        // 智能选择最佳候选项
+        String bestCandidate = selectBestCandidate(candidates);
+        
+        if (!TextUtils.isEmpty(bestCandidate)) {
+            Log.i(TAG, "选择的最佳候选项: '" + bestCandidate + "'");
+            return bestCandidate;
+        }
+        
+        // 如果智能选择失败，返回第一个非空候选项
+        for (String candidate : candidates) {
+            if (!TextUtils.isEmpty(candidate)) {
+                Log.i(TAG, "使用第一个非空候选项: '" + candidate + "'");
+                return candidate;
+            }
+        }
+        
+        Log.w(TAG, "所有提取方法都失败，返回原始文本");
+        return fullText.trim();
+    }
+    
+    /**
+     * 智能选择最佳的组装件ID候选项
+     */
+    private String selectBestCandidate(List<String> candidates) {
+        if (candidates.isEmpty()) {
+            return "";
+        }
+        
+        // 优先级规则：
+        // 1. 包含数字和字母的混合字符串（典型的组装件ID格式）
+        // 2. 长度合适的字符串（5-20个字符）
+        // 3. 不含特殊符号的字符串
+        
+        String best = "";
+        int bestScore = -1;
+        
+        for (String candidate : candidates) {
+            if (TextUtils.isEmpty(candidate)) continue;
+            
+            candidate = candidate.trim();
+            int score = 0;
+            
+            // 长度评分（5-20字符最佳）
+            int len = candidate.length();
+            if (len >= 5 && len <= 20) {
+                score += 10;
+            } else if (len >= 3 && len <= 30) {
+                score += 5;
+            }
+            
+            // 字符组成评分
+            boolean hasDigit = candidate.matches(".*\\d.*");
+            boolean hasLetter = candidate.matches(".*[a-zA-Z].*");
+            boolean hasSpecial = candidate.matches(".*[^a-zA-Z0-9\\-_].*");
+            
+            if (hasDigit && hasLetter) {
+                score += 15; // 数字和字母混合最佳
+            } else if (hasDigit || hasLetter) {
+                score += 8;  // 纯数字或纯字母次之
+            }
+            
+            if (!hasSpecial) {
+                score += 5; // 没有特殊字符加分
+            }
+            
+            // 常见组装件ID模式加分
+            if (candidate.matches("^[A-Z0-9\\-_]+$")) {
+                score += 10; // 大写字母数字下划线横线组合
+            }
+            if (candidate.matches("^\\d{6,}$")) {
+                score += 8;  // 6位以上数字编号
+            }
+            
+            Log.d(TAG, "候选项 '" + candidate + "' 得分: " + score);
+            
+            if (score > bestScore) {
+                bestScore = score;
+                best = candidate;
+            }
+        }
+        
+        return best;
+    }
+    
+    /**
+     * 显示OCR识别结果对话框，让用户手动选择或编辑
+     */
+    private void showOcrResultDialog(String recognizedText) {
+        if (mainActivity == null) return;
+        
+        AlertDialog.Builder builder = new AlertDialog.Builder(mainActivity);
+        builder.setTitle("OCR识别结果");
+        builder.setMessage("识别到以下文字，请确认是否正确：\n\n" + recognizedText);
+        
+        builder.setPositiveButton("使用此文字", (dialog, which) -> {
+            etAssembleId.setText(recognizedText.trim());
+            updateSummary();
+            updateButtonStates();
+            showToast("已填入识别的文字");
+        });
+        
+        builder.setNegativeButton("重新拍照", (dialog, which) -> {
+            // 用户选择重新拍照
+            takePhoto();
+        });
+        
+        builder.setNeutralButton("手动输入", (dialog, which) -> {
+            // 聚焦到输入框
+            etAssembleId.requestFocus();
+            showToast("请手动输入组装件ID");
+        });
+        
+        builder.show();
     }
 
     @OnClick(R.id.btn_clear_assemble)

@@ -85,5 +85,6 @@ dependencies {
     annotationProcessor 'com.jakewharton:butterknife-compiler:10.2.3'
     implementation 'com.squareup.okhttp3:okhttp:4.9.3'
     implementation 'com.google.code.gson:gson:2.8.9'
-    implementation 'com.google.mlkit:text-recognition:16.0.0-beta6'
+    // 修复OCR功能 - 使用稳定版本的ML Kit
+    implementation 'com.google.mlkit:text-recognition:16.0.0'
 }
