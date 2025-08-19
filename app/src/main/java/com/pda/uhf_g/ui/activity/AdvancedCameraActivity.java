@@ -117,18 +117,80 @@ public class AdvancedCameraActivity extends AppCompatActivity {
     }
     
     private void startSimpleCamera() {
-        Log.d(TAG, "Starting simple camera mode");
+        Log.d(TAG, "尝试启动高分辨率拍照模式");
+        
+        // 第一步：尝试高分辨率模式
+        if (tryHighResolutionCamera()) {
+            return; // 成功启动高分辨率模式
+        }
+        
+        // 第二步：降级到简单模式
+        Log.w(TAG, "高分辨率模式失败，使用简单模式");
         try {
             Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
-                Log.d(TAG, "Camera intent resolved, starting activity");
+                Log.d(TAG, "启动简单拍照模式");
                 startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE_SIMPLE);
             } else {
                 showErrorAndFinish("未找到相机应用");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error starting simple camera: " + e.getMessage(), e);
+            Log.e(TAG, "启动简单相机失败: " + e.getMessage(), e);
             showErrorAndFinish("启动相机失败: " + e.getMessage());
+        }
+    }
+    
+    // 新增：安全的高分辨率拍照尝试
+    private boolean tryHighResolutionCamera() {
+        try {
+            Log.d(TAG, "尝试创建高分辨率图片文件");
+            
+            // 创建临时文件
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+            String imageFileName = "OCR_" + timeStamp + ".jpg";
+            
+            // 尝试使用外部缓存目录（更安全）
+            File storageDir = getExternalCacheDir();
+            if (storageDir == null) {
+                Log.w(TAG, "外部缓存目录不可用，尝试内部缓存");
+                storageDir = getCacheDir();
+            }
+            
+            if (storageDir == null || !storageDir.exists()) {
+                Log.w(TAG, "缓存目录不可用");
+                return false;
+            }
+            
+            File photoFile = new File(storageDir, imageFileName);
+            currentPhotoPath = photoFile.getAbsolutePath();
+            Log.d(TAG, "创建图片文件: " + currentPhotoPath);
+            
+            // 尝试创建URI
+            Uri photoURI;
+            try {
+                photoURI = FileProvider.getUriForFile(this,
+                        "com.pda.uhf_g.fileprovider", photoFile);
+                Log.d(TAG, "成功创建URI: " + photoURI);
+            } catch (Exception e) {
+                Log.w(TAG, "FileProvider创建URI失败: " + e.getMessage());
+                return false;
+            }
+            
+            // 启动高分辨率拍照
+            Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+                Log.d(TAG, "启动高分辨率拍照");
+                startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+                return true;
+            } else {
+                Log.w(TAG, "未找到相机应用");
+                return false;
+            }
+            
+        } catch (Exception e) {
+            Log.w(TAG, "高分辨率模式设置失败: " + e.getMessage(), e);
+            return false;
         }
     }
     
@@ -184,8 +246,72 @@ public class AdvancedCameraActivity extends AppCompatActivity {
     }
     
     private void handleHighResCameraResult() {
-        // 高分辨率模式处理（暂时留空，先确保简单模式工作）
-        Log.d(TAG, "High resolution mode not implemented yet");
+        Log.d(TAG, "处理高分辨率拍照结果");
+        
+        try {
+            if (currentPhotoPath == null) {
+                Log.e(TAG, "图片路径为空");
+                showErrorAndFinish("图片路径丢失");
+                return;
+            }
+            
+            File photoFile = new File(currentPhotoPath);
+            if (!photoFile.exists()) {
+                Log.e(TAG, "图片文件不存在: " + currentPhotoPath);
+                showErrorAndFinish("图片文件不存在");
+                return;
+            }
+            
+            Log.d(TAG, "开始加载高分辨率图片: " + currentPhotoPath);
+            
+            // 安全地加载图片
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(currentPhotoPath, options);
+            
+            int imageWidth = options.outWidth;
+            int imageHeight = options.outHeight;
+            Log.d(TAG, "原始图片尺寸: " + imageWidth + "x" + imageHeight);
+            
+            if (imageWidth <= 0 || imageHeight <= 0) {
+                Log.e(TAG, "图片尺寸无效");
+                showErrorAndFinish("图片数据无效");
+                return;
+            }
+            
+            // 计算合适的采样率 - 保持高质量但避免内存问题
+            int maxDimension = 2048;
+            int sampleSize = 1;
+            
+            while ((imageWidth / sampleSize) > maxDimension || (imageHeight / sampleSize) > maxDimension) {
+                sampleSize *= 2;
+            }
+            
+            Log.d(TAG, "使用采样率: " + sampleSize);
+            
+            // 加载图片
+            options.inJustDecodeBounds = false;
+            options.inSampleSize = sampleSize;
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            
+            originalBitmap = BitmapFactory.decodeFile(currentPhotoPath, options);
+            
+            if (originalBitmap != null) {
+                Log.d(TAG, "高分辨率图片加载成功: " + originalBitmap.getWidth() + "x" + 
+                          originalBitmap.getHeight());
+                showPhotoEditingView();
+            } else {
+                Log.e(TAG, "图片解码失败");
+                showErrorAndFinish("图片解码失败");
+            }
+            
+        } catch (OutOfMemoryError e) {
+            Log.e(TAG, "内存不足: " + e.getMessage(), e);
+            showErrorAndFinish("图片过大，内存不足");
+        } catch (Exception e) {
+            Log.e(TAG, "处理高分辨率图片失败: " + e.getMessage(), e);
+            showErrorAndFinish("图片处理失败: " + e.getMessage());
+        }
     }
     
     private void showPhotoEditingView() {

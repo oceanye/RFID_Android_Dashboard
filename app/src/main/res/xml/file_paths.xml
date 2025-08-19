@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 外部存储私有目录用于保存拍照的高分辨率图片 -->
+    <!-- 外部缓存目录 - 更安全，系统会自动清理 -->
+    <external-cache-path name="external_cache" path="." />
+    <!-- 内部缓存目录备用 -->
+    <cache-path name="internal_cache" path="." />
+    <!-- 外部存储私有目录（备用） -->
     <external-files-path name="external_pictures" path="Pictures/" />
-    <!-- 内部存储私有目录备用 -->
+    <!-- 内部存储私有目录（备用） -->
     <files-path name="internal_files" path="/" />
     <files-path name="internal_pictures" path="Pictures/" />
 </paths>
