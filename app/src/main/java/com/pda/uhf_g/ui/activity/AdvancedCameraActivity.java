@@ -63,13 +63,20 @@ public class AdvancedCameraActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_advanced_camera);
         
-        initViews();
-        setupListeners();
-        
-        // 自动启动相机
-        startCamera();
+        try {
+            setContentView(R.layout.activity_advanced_camera);
+            
+            initViews();
+            setupListeners();
+            
+            // 自动启动相机
+            startCamera();
+        } catch (Exception e) {
+            Log.e(TAG, "Activity创建失败: " + e.getMessage(), e);
+            Toast.makeText(this, "初始化失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            finish();
+        }
     }
     
     private void initViews() {
@@ -90,14 +97,25 @@ public class AdvancedCameraActivity extends AppCompatActivity {
         btnRetakePhoto.setOnClickListener(v -> startCamera());
     }
     
-    // 修复：创建高分辨率图片文件
+    // 修复：创建高分辨率图片文件 - 增加错误处理
     private File createImageFile() throws IOException {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         String imageFileName = "UHFG_OCR_" + timeStamp + "_";
-        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         
-        if (storageDir != null && !storageDir.exists()) {
-            storageDir.mkdirs();
+        // 尝试多个存储位置
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        if (storageDir == null || !storageDir.exists()) {
+            // 如果外部存储不可用，使用内部存储
+            storageDir = new File(getFilesDir(), "Pictures");
+            Log.w(TAG, "外部存储不可用，使用内部存储: " + storageDir);
+        }
+        
+        if (!storageDir.exists()) {
+            boolean created = storageDir.mkdirs();
+            Log.d(TAG, "创建存储目录: " + storageDir + ", 成功: " + created);
+            if (!created) {
+                throw new IOException("无法创建存储目录: " + storageDir);
+            }
         }
         
         File image = File.createTempFile(imageFileName, ".jpg", storageDir);
@@ -107,7 +125,7 @@ public class AdvancedCameraActivity extends AppCompatActivity {
         return image;
     }
     
-    // 修复：使用高分辨率拍照
+    // 修复：使用高分辨率拍照 - 增加降级兼容性
     private void startCamera() {
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         
@@ -117,18 +135,41 @@ public class AdvancedCameraActivity extends AppCompatActivity {
                 photoFile = createImageFile();
             } catch (IOException ex) {
                 Log.e(TAG, "创建图片文件失败: " + ex.getMessage());
-                Toast.makeText(this, "创建图片文件失败", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "创建图片文件失败，尝试使用简单模式", Toast.LENGTH_SHORT).show();
+                
+                // 降级到简单拍照模式
+                startSimpleCamera();
                 return;
             }
             
             if (photoFile != null) {
-                Uri photoURI = FileProvider.getUriForFile(this,
-                        "com.pda.uhf_g.fileprovider", photoFile);
-                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
-                
-                Log.d(TAG, "启动高分辨率拍照，输出URI: " + photoURI);
-                startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+                try {
+                    Uri photoURI = FileProvider.getUriForFile(this,
+                            "com.pda.uhf_g.fileprovider", photoFile);
+                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+                    
+                    Log.d(TAG, "启动高分辨率拍照，输出URI: " + photoURI);
+                    startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+                } catch (Exception e) {
+                    Log.e(TAG, "FileProvider创建URI失败: " + e.getMessage());
+                    Toast.makeText(this, "文件访问失败，尝试使用简单模式", Toast.LENGTH_SHORT).show();
+                    
+                    // 降级到简单拍照模式
+                    startSimpleCamera();
+                }
             }
+        } else {
+            Toast.makeText(this, "无法找到相机应用", Toast.LENGTH_SHORT).show();
+            finish();
+        }
+    }
+    
+    // 降级兼容：简单拍照模式（使用缩略图）
+    private void startSimpleCamera() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+            Log.w(TAG, "使用降级的简单拍照模式");
+            startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE + 1000); // 使用不同的请求码
         }
     }
     
@@ -136,17 +177,41 @@ public class AdvancedCameraActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         
-        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-            // 修复：从文件加载高分辨率图片，而不是从Intent获取缩略图
-            if (currentPhotoPath != null) {
-                loadHighResolutionBitmap();
-            } else {
-                Log.e(TAG, "图片路径为空");
-                Toast.makeText(this, "图片加载失败", Toast.LENGTH_SHORT).show();
-                finish();
+        if (resultCode == RESULT_OK) {
+            if (requestCode == REQUEST_IMAGE_CAPTURE) {
+                // 高分辨率模式：从文件加载图片
+                if (currentPhotoPath != null) {
+                    loadHighResolutionBitmap();
+                } else {
+                    Log.e(TAG, "图片路径为空");
+                    Toast.makeText(this, "图片加载失败", Toast.LENGTH_SHORT).show();
+                    finish();
+                }
+            } else if (requestCode == REQUEST_IMAGE_CAPTURE + 1000) {
+                // 降级模式：从Intent获取缩略图
+                Log.w(TAG, "使用降级模式处理拍照结果");
+                try {
+                    Bundle extras = data.getExtras();
+                    originalBitmap = (Bitmap) extras.get("data");
+                    
+                    if (originalBitmap != null) {
+                        Log.w(TAG, "降级模式获得图片: " + originalBitmap.getWidth() + "x" + originalBitmap.getHeight() + 
+                                  " (分辨率较低，可能影响OCR效果)");
+                        showPhotoEditingView();
+                    } else {
+                        Log.e(TAG, "降级模式也无法获取图片");
+                        Toast.makeText(this, "拍照失败，请重试", Toast.LENGTH_SHORT).show();
+                        finish();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "处理降级模式拍照结果失败: " + e.getMessage(), e);
+                    Toast.makeText(this, "图片处理失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    finish();
+                }
             }
         } else {
             // 用户取消拍照，返回上一页
+            Log.d(TAG, "用户取消拍照");
             finish();
         }
     }
