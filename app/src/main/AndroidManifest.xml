@@ -39,6 +39,17 @@
             android:label="@string/take_photo_ocr"
             android:theme="@style/Theme.UHFG.NoActionBar"
             android:screenOrientation="portrait" />
+            
+        <!-- 修复：添加FileProvider用于高分辨率图片支持 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.pda.uhf_g.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

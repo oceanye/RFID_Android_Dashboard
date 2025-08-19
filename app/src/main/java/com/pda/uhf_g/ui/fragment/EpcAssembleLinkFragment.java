@@ -1204,7 +1204,7 @@ public class EpcAssembleLinkFragment extends BaseFragment {
     }
     
     /**
-     * 图像预处理以提高OCR识别精度
+     * 图像预处理以提高OCR识别精度 - 修复：保持原始高分辨率
      */
     private Bitmap preprocessImageForOCR(Bitmap originalBitmap) {
         if (originalBitmap == null || originalBitmap.isRecycled()) {
@@ -1212,38 +1212,42 @@ public class EpcAssembleLinkFragment extends BaseFragment {
         }
         
         try {
+            int width = originalBitmap.getWidth();
+            int height = originalBitmap.getHeight();
+            
+            Log.d(TAG, "预处理输入图片: " + width + "x" + height + ", 格式: " + originalBitmap.getConfig());
+            
+            // 修复：对于OCR，保持高分辨率很重要，只在必要时才缩放
+            int minDimension = 400;   // 提高最小尺寸要求
+            int maxDimension = 3072;  // 大幅提高最大尺寸限制，现代设备可以处理
+            
             Bitmap processedBitmap = originalBitmap;
             
-            // 1. 确保图片有足够的分辨率进行OCR
-            int minDimension = 300;  // 最小维度
-            int maxDimension = 1024; // 最大维度，避免内存问题
-            
-            int width = processedBitmap.getWidth();
-            int height = processedBitmap.getHeight();
-            
-            // 如果图片太小，放大到合适尺寸
-            if (width < minDimension || height < minDimension) {
+            // 只有当图片非常小时才放大
+            if (width < minDimension && height < minDimension) {
                 float scaleFactor = Math.max(
                     (float) minDimension / width, 
                     (float) minDimension / height
                 );
                 
+                // 限制放大倍数，避免过度放大导致模糊
+                scaleFactor = Math.min(scaleFactor, 3.0f);
+                
                 int newWidth = (int) (width * scaleFactor);
                 int newHeight = (int) (height * scaleFactor);
                 
-                Log.d(TAG, "图片太小，放大: " + width + "x" + height + " -> " + newWidth + "x" + newHeight);
+                Log.d(TAG, "图片尺寸过小，进行高质量放大: " + width + "x" + height + 
+                          " -> " + newWidth + "x" + newHeight + ", 倍数: " + scaleFactor);
                 
+                // 使用高质量缩放
                 Bitmap scaledBitmap = Bitmap.createScaledBitmap(processedBitmap, newWidth, newHeight, true);
                 if (scaledBitmap != processedBitmap && processedBitmap != originalBitmap) {
                     processedBitmap.recycle();
                 }
                 processedBitmap = scaledBitmap;
-                width = newWidth;
-                height = newHeight;
             }
-            
-            // 如果图片太大，缩小到合适尺寸
-            else if (width > maxDimension || height > maxDimension) {
+            // 只有当图片极其巨大时才缩小
+            else if (width > maxDimension && height > maxDimension) {
                 float scaleFactor = Math.min(
                     (float) maxDimension / width, 
                     (float) maxDimension / height
@@ -1252,13 +1256,17 @@ public class EpcAssembleLinkFragment extends BaseFragment {
                 int newWidth = (int) (width * scaleFactor);
                 int newHeight = (int) (height * scaleFactor);
                 
-                Log.d(TAG, "图片太大，缩小: " + width + "x" + height + " -> " + newWidth + "x" + newHeight);
+                Log.d(TAG, "图片尺寸过大，适当缩小: " + width + "x" + height + 
+                          " -> " + newWidth + "x" + newHeight + ", 倍数: " + scaleFactor);
                 
+                // 使用高质量缩放
                 Bitmap scaledBitmap = Bitmap.createScaledBitmap(processedBitmap, newWidth, newHeight, true);
                 if (scaledBitmap != processedBitmap && processedBitmap != originalBitmap) {
                     processedBitmap.recycle();
                 }
                 processedBitmap = scaledBitmap;
+            } else {
+                Log.d(TAG, "图片尺寸合适，保持原始分辨率: " + width + "x" + height);
             }
             
             Log.d(TAG, "预处理完成，最终尺寸: " + processedBitmap.getWidth() + "x" + processedBitmap.getHeight());
