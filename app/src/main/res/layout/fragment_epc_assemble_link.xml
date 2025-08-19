@@ -153,6 +153,23 @@
                 android:hint="@string/enter_assemble_id_manual"
                 android:inputType="text" />
 
+            <!-- Location Input -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="位置信息"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/et_location"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="输入位置信息 (可选)"
+                android:inputType="text" />
+
             <!-- Status Selection -->
             <TextView
                 android:layout_width="match_parent"

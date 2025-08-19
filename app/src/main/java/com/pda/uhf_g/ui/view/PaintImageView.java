@@ -192,15 +192,19 @@ public class PaintImageView extends AppCompatImageView {
     }
     
     /**
-     * 获取裁剪后的图片（只保留涂抹区域）
+     * 获取裁剪后的图片（只保留涂抹区域）- 修复：保持高清晰度
      */
     public Bitmap getCroppedBitmap() {
         if (imageBitmap == null || canvasBitmap == null) {
             return null;
         }
         
+        if (paths.isEmpty()) {
+            return null; // 没有涂抹内容
+        }
+        
         try {
-            // 创建结果图片
+            // 修复：使用原图尺寸创建高质量结果图片
             Bitmap resultBitmap = Bitmap.createBitmap(
                 imageBitmap.getWidth(), 
                 imageBitmap.getHeight(), 
@@ -217,7 +221,7 @@ public class PaintImageView extends AppCompatImageView {
             float transX = imageMatrix[2];
             float transY = imageMatrix[5];
             
-            // 创建遮罩
+            // 创建高精度遮罩
             Bitmap maskBitmap = Bitmap.createBitmap(
                 imageBitmap.getWidth(), 
                 imageBitmap.getHeight(), 
@@ -225,31 +229,88 @@ public class PaintImageView extends AppCompatImageView {
             );
             Canvas maskCanvas = new Canvas(maskBitmap);
             
-            // 将涂抹区域转换到图片坐标系
+            // 修复：创建高质量遮罩画笔
             Paint maskPaint = new Paint();
+            maskPaint.setAntiAlias(true); // 开启抗锯齿
+            maskPaint.setDither(true);    // 开启抖动
             maskPaint.setColor(0xFFFFFFFF);
             maskPaint.setStyle(Paint.Style.STROKE);
-            maskPaint.setStrokeWidth(30f / scaleX); // 调整画笔大小
+            maskPaint.setStrokeWidth(Math.max(20f / scaleX, 10f)); // 调整画笔大小，保持最小宽度
             maskPaint.setStrokeJoin(Paint.Join.ROUND);
             maskPaint.setStrokeCap(Paint.Cap.ROUND);
             
-            // 绘制涂抹路径到遮罩
+            // 绘制涂抹路径到遮罩 - 使用更精确的变换
             for (Path path : paths) {
                 Path transformedPath = new Path();
                 android.graphics.Matrix matrix = new android.graphics.Matrix();
-                matrix.setScale(1/scaleX, 1/scaleY);
+                
+                // 修复：使用更精确的矩阵变换
+                matrix.setScale(1.0f/scaleX, 1.0f/scaleY);
                 matrix.postTranslate(-transX/scaleX, -transY/scaleY);
+                
                 path.transform(matrix, transformedPath);
                 maskCanvas.drawPath(transformedPath, maskPaint);
             }
             
-            // 绘制原图
+            // 绘制原图到结果画布
             resultCanvas.drawBitmap(imageBitmap, 0, 0, null);
             
-            // 应用遮罩
+            // 应用遮罩 - 只保留涂抹区域
             Paint xferPaint = new Paint();
+            xferPaint.setAntiAlias(true);
+            xferPaint.setFilterBitmap(true); // 修复：开启高质量过滤
             xferPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
             resultCanvas.drawBitmap(maskBitmap, 0, 0, xferPaint);
+            
+            // 修复：如果结果图片存在有效内容但尺寸较小，进行高质量放大
+            // 检查实际涂抹区域大小
+            android.graphics.Rect bounds = new android.graphics.Rect();
+            for (Path path : paths) {
+                android.graphics.RectF pathBounds = new android.graphics.RectF();
+                path.computeBounds(pathBounds, true);
+                
+                int left = (int) Math.max(0, (pathBounds.left - transX) / scaleX);
+                int top = (int) Math.max(0, (pathBounds.top - transY) / scaleY);
+                int right = (int) Math.min(imageBitmap.getWidth(), (pathBounds.right - transX) / scaleX);
+                int bottom = (int) Math.min(imageBitmap.getHeight(), (pathBounds.bottom - transY) / scaleY);
+                
+                if (bounds.isEmpty()) {
+                    bounds.set(left, top, right, bottom);
+                } else {
+                    bounds.union(left, top, right, bottom);
+                }
+            }
+            
+            // 如果涂抹区域太小，裁剪出该区域并适当放大
+            if (!bounds.isEmpty() && (bounds.width() < 300 || bounds.height() < 150)) {
+                try {
+                    Bitmap croppedRegion = Bitmap.createBitmap(resultBitmap, 
+                        bounds.left, bounds.top, bounds.width(), bounds.height());
+                    
+                    // 计算合适的放大倍数
+                    float scaleUp = Math.min(
+                        400.0f / bounds.width(), 
+                        200.0f / bounds.height()
+                    );
+                    scaleUp = Math.max(1.5f, Math.min(scaleUp, 3.0f)); // 限制放大倍数在1.5-3倍之间
+                    
+                    int newWidth = (int) (bounds.width() * scaleUp);
+                    int newHeight = (int) (bounds.height() * scaleUp);
+                    
+                    Bitmap scaledBitmap = Bitmap.createScaledBitmap(
+                        croppedRegion, newWidth, newHeight, true);
+                    
+                    if (scaledBitmap != croppedRegion) {
+                        croppedRegion.recycle();
+                    }
+                    
+                    resultBitmap.recycle();
+                    return scaledBitmap;
+                } catch (Exception e) {
+                    // 如果裁剪放大失败，返回原结果
+                    e.printStackTrace();
+                }
+            }
             
             return resultBitmap;
             

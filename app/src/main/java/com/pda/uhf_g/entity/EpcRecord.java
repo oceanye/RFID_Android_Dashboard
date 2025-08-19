@@ -5,7 +5,7 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * EPC记录实体类 v3.6.4
+ * EPC记录实体类 v3.6.6
  * 支持设备追踪和状态管理的增强版本
  */
 public class EpcRecord implements Serializable {
@@ -22,7 +22,7 @@ public class EpcRecord implements Serializable {
     
     public EpcRecord() {
         this.createTime = new Date();
-        this.appVersion = "v3.6.4";
+        this.appVersion = "v3.6.6";
         this.deviceId = getDeviceIdentifier();
         this.deviceType = detectDeviceType();
     }

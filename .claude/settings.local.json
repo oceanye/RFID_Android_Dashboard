@@ -10,7 +10,17 @@
       "Bash(grep:*)",
       "Bash(git push:*)",
       "Bash(chmod:*)",
-      "Bash(scp:*)"
+      "Bash(scp:*)",
+      "Bash(mysql:*)",
+      "Bash(where mysql)",
+      "Bash(auto-deploy.bat)",
+      "Bash(cmd:*)",
+      "Bash(where pscp)",
+      "Bash(ssh:*)",
+      "Bash(sed:*)",
+      "Bash(gradlew.bat assembleDebug:*)",
+      "Bash(auto-deploy-v366.bat)",
+      "Bash(upload-to-server.bat)"
     ],
     "deny": []
   }

@@ -10,8 +10,8 @@ android {
         applicationId "com.pda.uhf_g"
         minSdkVersion 21
         targetSdkVersion 30
-        versionCode 36
-        versionName "3.6"
+        versionCode 366
+        versionName "3.6.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         ndk {

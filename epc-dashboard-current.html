@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>构件RFID信息看板 v3.6.6 - 增强数据管理</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1em;
+            margin-top: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-card .icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8em;
+            color: white;
+            margin-bottom: 15px;
+        }
+
+        .stat-card .value {
+            font-size: 2.2em;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .label {
+            color: #7f8c8d;
+            font-size: 1em;
+            font-weight: 500;
+        }
+
+        .stat-card .trend {
+            font-size: 0.9em;
+            margin-top: 10px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .trend.up {
+            background: rgba(46, 204, 113, 0.1);
+            color: #27ae60;
+        }
+
+        .trend.down {
+            background: rgba(231, 76, 60, 0.1);
+            color: #e74c3c;
+        }
+
+        .charts-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .chart-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-card h3 {
+            color: #2c3e50;
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .data-table {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .table-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 45px 12px 15px;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .search-box .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #bdc3c7;
+        }
+
+        .refresh-btn, .export-btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover, .export-btn:hover {
+            background: linear-gradient(135deg, #2980b9, #1f5f99);
+            transform: translateY(-2px);
+        }
+
+        .export-btn {
+            background: linear-gradient(135deg, #27ae60, #219a52);
+        }
+
+        .export-btn:hover {
+            background: linear-gradient(135deg, #219a52, #1e8449);
+        }
+
+        .records-btn {
+            background: linear-gradient(135deg, #8e44ad, #732d91);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .records-btn:hover {
+            background: linear-gradient(135deg, #732d91, #5b2471);
+            transform: translateY(-2px);
+        }
+
+        /* ID记录查看模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 3% auto;
+            padding: 20px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 1200px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .modal-header h2 {
+            color: #2c3e50;
+            font-size: 1.8em;
+            font-weight: 600;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .search-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .search-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .search-field label {
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
+        }
+
+        .search-field input {
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .search-field input:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        .search-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .btn-search, .btn-clear {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-search {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-clear {
+            background: #6c757d;
+            color: white;
+        }
+
+        .records-table-wrapper {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .records-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .records-table th,
+        .records-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .records-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .records-table tr:hover {
+            background: #f1f3f4;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .page-btn {
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .page-btn:hover {
+            background: #e9ecef;
+        }
+
+        .page-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th, td {
+            padding: 15px 12px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        th {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            font-weight: 600;
+            color: #2c3e50;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: rgba(52, 152, 219, 0.05);
+        }
+
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .status-uploaded {
+            background: rgba(46, 204, 113, 0.1);
+            color: #27ae60;
+        }
+
+        .status-local {
+            background: rgba(241, 196, 15, 0.1);
+            color: #f39c12;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .loading i {
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            border: 2px solid #ecf0f1;
+            background: white;
+            color: #7f8c8d;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .current {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .no-data i {
+            font-size: 3em;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .table-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                min-width: unset;
+            }
+        }
+
+        /* 图表颜色主题 */
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --accent-color: #e74c3c;
+            --warning-color: #f39c12;
+            --info-color: #9b59b6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 页面头部 -->
+        <div class="header">
+            <h1>
+                <i class="fas fa-chart-line"></i>
+                构件RFID信息看板
+            </h1>
+            <div class="subtitle">
+                实时监控构件RFID标签信息数据 • 最后更新: <span id="lastUpdate">-</span>
+            </div>
+        </div>
+
+        <!-- 统计卡片区域 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="icon" style="background: linear-gradient(135deg, #3498db, #2980b9);">
+                    <i class="fas fa-database"></i>
+                </div>
+                <div class="value" id="totalRecords">-</div>
+                <div class="label">总记录数</div>
+                <div class="trend up" id="totalTrend">
+                    <i class="fas fa-arrow-up"></i> +0%
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="icon" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <div class="value" id="uploadedRecords">-</div>
+                <div class="label">已上传记录</div>
+                <div class="trend up" id="uploadedTrend">
+                    <i class="fas fa-arrow-up"></i> +0%
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="icon" style="background: linear-gradient(135deg, #f39c12, #e67e22);">
+                    <i class="fas fa-calendar-day"></i>
+                </div>
+                <div class="value" id="todayRecords">-</div>
+                <div class="label">今日新增</div>
+                <div class="trend up" id="todayTrend">
+                    <i class="fas fa-arrow-up"></i> +0%
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="icon" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">
+                    <i class="fas fa-tags"></i>
+                </div>
+                <div class="value" id="uniqueEpcs">-</div>
+                <div class="label">唯一RFID数</div>
+                <div class="trend up" id="epcTrend">
+                    <i class="fas fa-arrow-up"></i> +0%
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="icon" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                    <i class="fas fa-cogs"></i>
+                </div>
+                <div class="value" id="uniqueAssembles">-</div>
+                <div class="label">唯一构件数</div>
+                <div class="trend up" id="assembleTrend">
+                    <i class="fas fa-arrow-up"></i> +0%
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="icon" style="background: linear-gradient(135deg, #1abc9c, #16a085);">
+                    <i class="fas fa-signal"></i>
+                </div>
+                <div class="value" id="avgRssi">-</div>
+                <div class="label">平均信号强度</div>
+                <div class="trend" id="rssiTrend">
+                    <i class="fas fa-minus"></i> 0 dBm
+                </div>
+            </div>
+        </div>
+
+        <!-- 图表区域 -->
+        <div class="charts-section">
+            <div class="chart-card">
+                <h3>
+                    <i class="fas fa-chart-line"></i>
+                    每日新增记录趋势
+                </h3>
+                <canvas id="dailyTrendChart"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h3>
+                    <i class="fas fa-chart-pie"></i>
+                    记录状态分布
+                </h3>
+                <canvas id="statusPieChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 数据表格区域 -->
+        <div class="data-table">
+            <div class="table-controls">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="搜索RFID ID或构件ID...">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="refresh-btn" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i>
+                        刷新数据
+                    </button>
+                    <button class="export-btn" onclick="exportData()">
+                        <i class="fas fa-download"></i>
+                        导出CSV
+                    </button>
+                    <button class="records-btn" onclick="openRecordsModal()">
+                        <i class="fas fa-list-alt"></i>
+                        📋 ID记录查看
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>RFID标签ID</th>
+                            <th>构件ID</th>
+                            <th>信号强度</th>
+                            <th>创建时间</th>
+                            <th>状态</th>
+                            <th>版本</th>
+                            <th>备注</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr>
+                            <td colspan="8" class="loading">
+                                <i class="fas fa-spinner"></i>
+                                加载数据中...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="pagination">
+                <!-- 分页控件将通过JavaScript生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ID记录查看模态框 -->
+    <div id="recordsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📋 EPC ID记录查看</h2>
+                <span class="close">&times;</span>
+            </div>
+            
+            <!-- 搜索控件 -->
+            <div class="search-controls">
+                <div class="search-field">
+                    <label>🔍 EPC ID:</label>
+                    <input type="text" id="searchEpcId" placeholder="搜索EPC ID">
+                </div>
+                <div class="search-field">
+                    <label>📱 设备ID:</label>
+                    <input type="text" id="searchDeviceId" placeholder="搜索设备ID">
+                </div>
+                <div class="search-field">
+                    <label>🏗️ 组装件ID:</label>
+                    <input type="text" id="searchAssembleId" placeholder="搜索组装件ID">
+                </div>
+                <div class="search-field">
+                    <label>📍 位置:</label>
+                    <input type="text" id="searchLocation" placeholder="搜索位置">
+                </div>
+                <div class="search-buttons">
+                    <button class="btn-search" onclick="searchRecords()">🔍 搜索</button>
+                    <button class="btn-clear" onclick="clearSearch()">🔄 清除</button>
+                </div>
+            </div>
+            
+            <!-- 搜索结果统计 -->
+            <div id="searchStats" style="display: none; padding: 10px; background: #e8f5e8; border-radius: 8px; margin-bottom: 15px;">
+                <!-- 统计信息将通过JavaScript填充 -->
+            </div>
+            
+            <!-- 记录表格 -->
+            <div class="records-table-wrapper">
+                <table class="records-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>EPC ID</th>
+                            <th>组装件ID</th>
+                            <th>位置</th>
+                            <th>设备ID</th>
+                            <th>状态</th>
+                            <th>RSSI</th>
+                            <th>创建时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordsTableBody">
+                        <!-- 记录数据将通过JavaScript填充 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 分页控件 -->
+            <div class="pagination" id="recordsPagination">
+                <!-- 分页按钮将通过JavaScript生成 -->
+            </div>
+            
+            <!-- 记录信息 -->
+            <div style="text-align: center; color: #6c757d; margin-top: 10px;">
+                <span id="recordsInfo">加载记录中...</span>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div style="text-align: right; margin-top: 20px; border-top: 1px solid #e9ecef; padding-top: 15px;">
+                <button class="export-btn" onclick="exportSearchResults()">📥 导出搜索结果</button>
+                <button class="btn-clear" onclick="closeRecordsModal()" style="margin-left: 10px;">❌ 关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        const API_BASE_URL = 'http://175.24.178.44:8082';
+        const API_CREDENTIALS = btoa('root:Rootroot!');
+        let currentPage = 1;
+        let pageSize = 20;
+        let totalRecords = 0;
+        let allData = [];
+        let filteredData = [];
+
+        // 图表变量
+        let dailyTrendChart = null;
+        let statusPieChart = null;
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboard();
+            setupEventListeners();
+            
+            // 定时刷新数据 (每30秒)
+            setInterval(() => {
+                refreshData(false); // 静默刷新，不显示加载状态
+            }, 30000);
+        });
+
+        // 初始化Dashboard
+        function initializeDashboard() {
+            loadData();
+            updateLastUpdateTime();
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 搜索功能
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('input', function() {
+                filterData(this.value);
+            });
+
+            // 键盘事件
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+                    e.preventDefault();
+                    refreshData();
+                }
+            });
+        }
+
+        // 加载数据
+        async function loadData() {
+            try {
+                showLoading();
+                
+                // 并发请求数据和统计信息
+                const [dataResponse, statsResponse] = await Promise.all([
+                    fetchWithAuth('/api/epc-assemble-link?limit=1000'),
+                    fetchStats()
+                ]);
+
+                if (dataResponse.success) {
+                    allData = dataResponse.data || [];
+                    filteredData = [...allData];
+                    totalRecords = allData.length;
+                    
+                    updateStatistics(statsResponse);
+                    updateCharts();
+                    renderTable();
+                    updateLastUpdateTime();
+                } else {
+                    showError('数据加载失败: ' + dataResponse.message);
+                }
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                showError('连接服务器失败，请检查网络连接');
+            }
+        }
+
+        // 获取统计数据
+        async function fetchStats() {
+            const data = allData.length > 0 ? allData : [];
+            
+            const today = new Date();
+            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            
+            const todayRecords = data.filter(record => 
+                new Date(record.create_time) >= todayStart
+            ).length;
+
+            const uploadedRecords = data.filter(record => record.uploaded).length;
+            
+            const uniqueEpcs = new Set(data.map(record => record.epc_id)).size;
+            const uniqueAssembles = new Set(data.map(record => record.assemble_id)).size;
+            
+            const validRssi = data
+                .map(record => parseFloat(record.rssi))
+                .filter(rssi => !isNaN(rssi));
+            const avgRssi = validRssi.length > 0 
+                ? (validRssi.reduce((a, b) => a + b, 0) / validRssi.length).toFixed(1)
+                : 0;
+
+            return {
+                totalRecords: data.length,
+                uploadedRecords,
+                todayRecords,
+                uniqueEpcs,
+                uniqueAssembles,
+                avgRssi
+            };
+        }
+
+        // 更新统计数据
+        function updateStatistics(stats) {
+            document.getElementById('totalRecords').textContent = stats.totalRecords.toLocaleString();
+            document.getElementById('uploadedRecords').textContent = stats.uploadedRecords.toLocaleString();
+            document.getElementById('todayRecords').textContent = stats.todayRecords.toLocaleString();
+            document.getElementById('uniqueEpcs').textContent = stats.uniqueEpcs.toLocaleString();
+            document.getElementById('uniqueAssembles').textContent = stats.uniqueAssembles.toLocaleString();
+            document.getElementById('avgRssi').textContent = stats.avgRssi + ' dBm';
+
+            // 更新趋势指示器（简化版本，实际应该与历史数据对比）
+            updateTrendIndicator('totalTrend', 5.2);
+            updateTrendIndicator('uploadedTrend', 3.8);
+            updateTrendIndicator('todayTrend', 12.5);
+            updateTrendIndicator('epcTrend', 2.1);
+            updateTrendIndicator('assembleTrend', 1.9);
+        }
+
+        // 更新趋势指示器
+        function updateTrendIndicator(elementId, percentage) {
+            const element = document.getElementById(elementId);
+            const isPositive = percentage >= 0;
+            
+            element.className = `trend ${isPositive ? 'up' : 'down'}`;
+            element.innerHTML = `
+                <i class="fas fa-arrow-${isPositive ? 'up' : 'down'}"></i>
+                ${isPositive ? '+' : ''}${percentage.toFixed(1)}%
+            `;
+        }
+
+        // 更新图表
+        function updateCharts() {
+            updateDailyTrendChart();
+            updateStatusPieChart();
+        }
+
+        // 更新每日趋势图表
+        function updateDailyTrendChart() {
+            const ctx = document.getElementById('dailyTrendChart').getContext('2d');
+            
+            // 获取最近7天的数据
+            const last7Days = [];
+            const dailyCounts = [];
+            
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+                last7Days.push(dateStr);
+                
+                const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                const dayEnd = new Date(dayStart);
+                dayEnd.setDate(dayEnd.getDate() + 1);
+                
+                const count = allData.filter(record => {
+                    const recordDate = new Date(record.create_time);
+                    return recordDate >= dayStart && recordDate < dayEnd;
+                }).length;
+                
+                dailyCounts.push(count);
+            }
+
+            if (dailyTrendChart) {
+                dailyTrendChart.destroy();
+            }
+
+            dailyTrendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: last7Days,
+                    datasets: [{
+                        label: '每日新增记录',
+                        data: dailyCounts,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#3498db',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 更新状态饼图
+        function updateStatusPieChart() {
+            const ctx = document.getElementById('statusPieChart').getContext('2d');
+            
+            const uploadedCount = allData.filter(record => record.uploaded).length;
+            const localCount = allData.length - uploadedCount;
+
+            if (statusPieChart) {
+                statusPieChart.destroy();
+            }
+
+            statusPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['已上传', '本地存储'],
+                    datasets: [{
+                        data: [uploadedCount, localCount],
+                        backgroundColor: [
+                            '#2ecc71',
+                            '#f39c12'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 渲染表格
+        function renderTable() {
+            const tableBody = document.getElementById('tableBody');
+            
+            if (filteredData.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="no-data">
+                            <i class="fas fa-inbox"></i>
+                            <div>暂无数据</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, filteredData.length);
+            const pageData = filteredData.slice(startIndex, endIndex);
+
+            tableBody.innerHTML = pageData.map(record => `
+                <tr>
+                    <td>${record.id}</td>
+                    <td><code>${record.epc_id}</code></td>
+                    <td><strong>${record.assemble_id}</strong></td>
+                    <td>${record.rssi || '-'} ${record.rssi ? 'dBm' : ''}</td>
+                    <td>${formatDateTime(record.create_time)}</td>
+                    <td>
+                        <span class="status-badge ${record.uploaded ? 'status-uploaded' : 'status-local'}">
+                            ${record.uploaded ? '已上传' : '本地存储'}
+                        </span>
+                    </td>
+                    <td>${record.app_version || 'v3.6'}</td>
+                    <td>${record.notes || '-'}</td>
+                </tr>
+            `).join('');
+
+            renderPagination();
+        }
+
+        // 渲染分页
+        function renderPagination() {
+            const pagination = document.getElementById('pagination');
+            const totalPages = Math.ceil(filteredData.length / pageSize);
+
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let paginationHTML = '';
+
+            // 上一页按钮
+            paginationHTML += `
+                <button ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            `;
+
+            // 页码按钮
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                paginationHTML += `<button onclick="changePage(1)">1</button>`;
+                if (startPage > 2) {
+                    paginationHTML += `<span>...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                paginationHTML += `
+                    <button class="${i === currentPage ? 'current' : ''}" onclick="changePage(${i})">
+                        ${i}
+                    </button>
+                `;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    paginationHTML += `<span>...</span>`;
+                }
+                paginationHTML += `<button onclick="changePage(${totalPages})">${totalPages}</button>`;
+            }
+
+            // 下一页按钮
+            paginationHTML += `
+                <button ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            `;
+
+            pagination.innerHTML = paginationHTML;
+        }
+
+        // 切换页面
+        function changePage(page) {
+            currentPage = page;
+            renderTable();
+        }
+
+        // 过滤数据
+        function filterData(searchTerm) {
+            if (!searchTerm.trim()) {
+                filteredData = [...allData];
+            } else {
+                const term = searchTerm.toLowerCase();
+                filteredData = allData.filter(record => 
+                    record.epc_id.toLowerCase().includes(term) ||
+                    record.assemble_id.toLowerCase().includes(term) ||
+                    (record.notes && record.notes.toLowerCase().includes(term))
+                );
+            }
+            
+            currentPage = 1;
+            renderTable();
+        }
+
+        // 刷新数据
+        async function refreshData(showLoading = true) {
+            if (showLoading) {
+                const refreshBtn = document.querySelector('.refresh-btn i');
+                refreshBtn.classList.add('fa-spin');
+            }
+            
+            try {
+                await loadData();
+            } finally {
+                if (showLoading) {
+                    const refreshBtn = document.querySelector('.refresh-btn i');
+                    refreshBtn.classList.remove('fa-spin');
+                }
+            }
+        }
+
+        // 导出CSV
+        function exportData() {
+            const csvContent = convertToCSV(filteredData);
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `rfid_data_${new Date().toISOString().slice(0, 10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 转换为CSV格式
+        function convertToCSV(data) {
+            const headers = ['ID', 'RFID标签ID', '构件ID', '信号强度', '创建时间', '已上传', '应用版本', '备注'];
+            const csvArray = [headers];
+
+            data.forEach(record => {
+                csvArray.push([
+                    record.id,
+                    record.epc_id,
+                    record.assemble_id,
+                    record.rssi || '',
+                    formatDateTime(record.create_time),
+                    record.uploaded ? '是' : '否',
+                    record.app_version || 'v3.6',
+                    record.notes || ''
+                ]);
+            });
+
+            return csvArray.map(row => 
+                row.map(cell => `"${cell}"`).join(',')
+            ).join('\n');
+        }
+
+        // 带认证的fetch请求
+        async function fetchWithAuth(endpoint) {
+            const response = await fetch(API_BASE_URL + endpoint, {
+                headers: {
+                    'Authorization': `Basic ${API_CREDENTIALS}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            return await response.json();
+        }
+
+        // 显示加载状态
+        function showLoading() {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="loading">
+                        <i class="fas fa-spinner"></i>
+                        加载数据中...
+                    </td>
+                </tr>
+            `;
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="no-data">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <div>${message}</div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        // 格式化日期时间
+        function formatDateTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        // 更新最后更新时间
+        function updateLastUpdateTime() {
+            document.getElementById('lastUpdate').textContent = 
+                new Date().toLocaleString('zh-CN');
+        }
+
+        // ===== ID记录查看功能 =====
+        
+        let currentSearchParams = {};
+        let currentPage = 1;
+        let pageSize = 50;
+        
+        // 打开ID记录查看模态框
+        function openRecordsModal() {
+            currentSearchParams = {};
+            currentPage = 1;
+            document.getElementById('recordsModal').style.display = 'block';
+            loadRecords();
+        }
+
+        // 关闭ID记录查看模态框
+        function closeRecordsModal() {
+            document.getElementById('recordsModal').style.display = 'none';
+        }
+
+        // 清除搜索条件
+        function clearSearch() {
+            document.getElementById('searchEpcId').value = '';
+            document.getElementById('searchDeviceId').value = '';
+            document.getElementById('searchAssembleId').value = '';
+            document.getElementById('searchLocation').value = '';
+            currentSearchParams = {};
+            currentPage = 1;
+            loadRecords();
+        }
+
+        // 执行搜索
+        function searchRecords() {
+            const epcId = document.getElementById('searchEpcId').value.trim();
+            const deviceId = document.getElementById('searchDeviceId').value.trim();
+            const assembleId = document.getElementById('searchAssembleId').value.trim();
+            const location = document.getElementById('searchLocation').value.trim();
+
+            currentSearchParams = {};
+            if (epcId) currentSearchParams.epcId = epcId;
+            if (deviceId) currentSearchParams.deviceId = deviceId;
+            if (assembleId) currentSearchParams.assembleId = assembleId;
+            if (location) currentSearchParams.location = location;
+
+            currentPage = 1;
+            loadRecords();
+        }
+
+        // 加载记录数据
+        async function loadRecords() {
+            try {
+                const params = new URLSearchParams({
+                    limit: pageSize,
+                    offset: (currentPage - 1) * pageSize,
+                    ...currentSearchParams
+                });
+
+                const auth = btoa('root:Rootroot!');
+                const response = await fetch(`/api/epc-records?${params}`, {
+                    headers: {
+                        'Authorization': `Basic ${auth}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        renderRecordsTable(data.data);
+                        renderPagination(data.pagination);
+                        renderRecordsStats(data.pagination);
+                    } else {
+                        throw new Error('获取记录数据失败');
+                    }
+                } else {
+                    throw new Error('API请求失败');
+                }
+            } catch (error) {
+                console.error('加载记录失败:', error);
+                document.getElementById('recordsTableBody').innerHTML = 
+                    '<tr><td colspan="8" style="text-align: center; padding: 30px; color: #dc3545;">加载失败: ' + error.message + '</td></tr>';
+            }
+        }
+
+        // 渲染记录表格
+        function renderRecordsTable(records) {
+            const tbody = document.getElementById('recordsTableBody');
+            
+            if (!records || records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px; color: #6c757d;">暂无记录数据</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = records.map(record => `
+                <tr>
+                    <td style="font-weight: 600;">${record.id}</td>
+                    <td style="font-family: monospace; color: #007bff;">${record.epc_id || 'N/A'}</td>
+                    <td>${record.assemble_id ? 
+                        `<span style="background: #e8f5e8; color: #155724; padding: 2px 6px; border-radius: 3px; font-size: 0.9em;">${record.assemble_id}</span>` 
+                        : '<span style="color: #6c757d;">-</span>'
+                    }</td>
+                    <td>${record.location ? 
+                        `<span style="background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 3px; font-size: 0.9em;">📍 ${record.location}</span>` 
+                        : '<span style="color: #6c757d;">-</span>'
+                    }</td>
+                    <td style="font-family: monospace; font-size: 0.9em;">${record.device_id || 'N/A'}</td>
+                    <td><span style="background: #f8f9fa; color: #495057; padding: 2px 6px; border-radius: 3px; font-size: 0.9em;">${record.status_note || '未知状态'}</span></td>
+                    <td style="text-align: center;">${record.rssi ? 
+                        `<span style="color: ${parseInt(record.rssi) > -50 ? '#28a745' : parseInt(record.rssi) > -70 ? '#ffc107' : '#dc3545'};">${record.rssi}dBm</span>` 
+                        : '<span style="color: #6c757d;">-</span>'
+                    }</td>
+                    <td style="font-size: 0.9em; color: #6c757d;">${record.create_time ? new Date(record.create_time).toLocaleString() : 'N/A'}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 渲染分页控件
+        function renderPagination(pagination) {
+            const paginationDiv = document.getElementById('recordsPagination');
+            const totalPages = Math.ceil(pagination.total / pagination.limit);
+            
+            if (totalPages <= 1) {
+                paginationDiv.innerHTML = '';
+                return;
+            }
+
+            let paginationHTML = '';
+            
+            // 上一页按钮
+            if (currentPage > 1) {
+                paginationHTML += `<button class="page-btn" onclick="goToPage(${currentPage - 1})">← 上一页</button>`;
+            }
+
+            // 页码按钮
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+
+            for (let i = startPage; i <= endPage; i++) {
+                const isActive = i === currentPage;
+                paginationHTML += `<button class="page-btn ${isActive ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+
+            // 下一页按钮
+            if (currentPage < totalPages) {
+                paginationHTML += `<button class="page-btn" onclick="goToPage(${currentPage + 1})">下一页 →</button>`;
+            }
+
+            paginationDiv.innerHTML = paginationHTML;
+        }
+
+        // 渲染记录统计信息
+        function renderRecordsStats(pagination) {
+            const statsDiv = document.getElementById('searchStats');
+            const info = document.getElementById('recordsInfo');
+            
+            const start = (currentPage - 1) * pagination.limit + 1;
+            const end = Math.min(start + pagination.returned - 1, pagination.total);
+            
+            info.textContent = `显示第 ${start}-${end} 条记录，共 ${pagination.total} 条`;
+
+            if (Object.keys(currentSearchParams).length > 0) {
+                statsDiv.style.display = 'block';
+                
+                const searchTerms = Object.entries(currentSearchParams)
+                    .map(([key, value]) => {
+                        const labels = {
+                            epcId: 'EPC ID',
+                            deviceId: '设备ID', 
+                            assembleId: '组装件ID',
+                            location: '位置'
+                        };
+                        return `${labels[key]}: "${value}"`;
+                    }).join(' | ');
+
+                statsDiv.innerHTML = `
+                    <strong>🔍 搜索条件:</strong> ${searchTerms}<br>
+                    <strong>📊 搜索结果:</strong> 找到 ${pagination.total} 条匹配记录
+                `;
+            } else {
+                statsDiv.style.display = 'none';
+            }
+        }
+
+        // 跳转到指定页面
+        function goToPage(page) {
+            currentPage = page;
+            loadRecords();
+        }
+
+        // 导出搜索结果
+        async function exportSearchResults() {
+            try {
+                const params = new URLSearchParams({
+                    limit: 10000,
+                    ...currentSearchParams
+                });
+
+                const auth = btoa('root:Rootroot!');
+                const response = await fetch(`/api/epc-records?${params}`, {
+                    headers: {
+                        'Authorization': `Basic ${auth}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        exportRecordsAsCSV(data.data, '搜索结果');
+                        showMessage('搜索结果导出成功！', 'success');
+                    } else {
+                        throw new Error('获取数据失败');
+                    }
+                } else {
+                    throw new Error('API请求失败');
+                }
+            } catch (error) {
+                console.error('导出搜索结果失败:', error);
+                showMessage('导出搜索结果失败: ' + error.message, 'error');
+            }
+        }
+
+        // 导出记录为CSV
+        function exportRecordsAsCSV(data, suffix = '') {
+            const headers = ['ID', 'EPC ID', '设备ID', '状态备注', '组装件ID', '位置', '创建时间', 'RSSI', '设备类型', '应用版本'];
+            const csvContent = [
+                headers.join(','),
+                ...data.map(row => [
+                    row.id,
+                    `"${row.epc_id}"`,
+                    `"${row.device_id}"`,
+                    `"${row.status_note}"`,
+                    `"${row.assemble_id || ''}"`,
+                    `"${row.location || ''}"`,
+                    `"${row.create_time}"`,
+                    `"${row.rssi || ''}"`,
+                    `"${row.device_type || ''}"`,
+                    `"${row.app_version || ''}"`
+                ].join(','))
+            ].join('\n');
+
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            
+            const fileName = suffix ? 
+                `epc_records_${suffix}_${new Date().toISOString().split('T')[0]}.csv` :
+                `epc_records_${new Date().toISOString().split('T')[0]}.csv`;
+            
+            link.download = fileName;
+            link.click();
+        }
+
+        // 显示消息
+        function showMessage(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                font-weight: 600;
+                z-index: 1001;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                ${type === 'success' ? 'background: #28a745; color: white;' : 'background: #dc3545; color: white;'}
+            `;
+            alertDiv.textContent = message;
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 3000);
+        }
+
+        // 模态框外部点击关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('recordsModal');
+            if (event.target === modal) {
+                closeRecordsModal();
+            }
+        }
+
+        // 回车键搜索
+        document.addEventListener('DOMContentLoaded', function() {
+            ['searchEpcId', 'searchDeviceId', 'searchAssembleId', 'searchLocation'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            searchRecords();
+                        }
+                    });
+                }
+            });
+            
+            // 模态框关闭按钮
+            const closeBtn = document.querySelector('.close');
+            if (closeBtn) {
+                closeBtn.onclick = closeRecordsModal;
+            }
+        });
+    </script>
+</body>
+</html>

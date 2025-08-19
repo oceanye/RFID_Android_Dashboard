@@ -77,6 +77,7 @@ public class EpcAssembleLinkFragment extends BaseFragment {
     private static final int REQUEST_CAMERA_PERMISSION = 200;
     private static final int REQUEST_IMAGE_CAPTURE = 201;
     private static final int REQUEST_ADVANCED_CAMERA = 202;
+    private static final String SERVER_URL_V366 = "http://175.24.178.44:8082/api/epc-record"; // v3.6.6 API
     private static final String SERVER_URL_V364 = "http://175.24.178.44:8082/api/epc-record"; // 新版本API
     private static final String SERVER_URL = "http://175.24.178.44:8082/api/epc-assemble-link"; // 兼容旧版本
     private static final String PING_URL = "http://175.24.178.44:8082/health"; // 健康检查端点
@@ -101,6 +102,8 @@ public class EpcAssembleLinkFragment extends BaseFragment {
     TextView tvEpcRank3;
     @BindView(R.id.et_assemble_id)
     EditText etAssembleId;
+    @BindView(R.id.et_location)
+    EditText etLocation;
     @BindView(R.id.spinner_status)
     Spinner spinnerStatus;
     @BindView(R.id.btn_take_photo)
@@ -1161,12 +1164,13 @@ public class EpcAssembleLinkFragment extends BaseFragment {
 
     @OnClick(R.id.btn_clear_assemble)
     public void clearAssembleId() {
-        // 简化功能：只清除组装件ID输入框
+        // 清除组装件ID和位置信息输入框
         etAssembleId.setText("");
+        etLocation.setText("");
         updateSummary();
         updateButtonStates();
-        showToast("组装件ID已清除");
-        Log.d(TAG, "Assembly ID cleared");
+        showToast("组装件ID和位置信息已清除");
+        Log.d(TAG, "Assembly ID and location cleared");
     }
     
     @OnClick(R.id.btn_confirm_upload)
@@ -1184,15 +1188,15 @@ public class EpcAssembleLinkFragment extends BaseFragment {
     }
 
     private boolean validateInput() {
-        if (TextUtils.isEmpty(currentEpcId)) {
-            showToast(getString(R.string.please_scan_epc_first));
-            return false;
-        }
-        
         String assembleId = etAssembleId.getText().toString().trim();
         if (TextUtils.isEmpty(assembleId)) {
             showToast(getString(R.string.please_enter_or_scan_assemble_id));
             return false;
+        }
+        
+        // 修复：允许只有组装件ID而没有EPC的情况
+        if (TextUtils.isEmpty(currentEpcId)) {
+            showToast("注意：将以纯组装件ID模式上传（未关联RFID标签）");
         }
         
         return true;
@@ -1200,16 +1204,29 @@ public class EpcAssembleLinkFragment extends BaseFragment {
 
     private void createLinkAndUpload() {
         String assembleId = etAssembleId.getText().toString().trim();
+        String location = etLocation.getText().toString().trim();
         String selectedStatus = spinnerStatus.getSelectedItem().toString();
         
+        // 修复：支持无EPC的情况，使用组装件ID作为标识
+        String epcId = TextUtils.isEmpty(currentEpcId) ? "MANUAL_" + assembleId : currentEpcId;
+        
         // 创建新版本EPC记录
-        currentRecord = new EpcRecord(currentEpcId, assembleId, selectedStatus);
-        currentRecord.setRssi(currentRssi);
+        currentRecord = new EpcRecord(epcId, assembleId, selectedStatus);
+        if (!TextUtils.isEmpty(currentRssi)) {
+            currentRecord.setRssi(currentRssi);
+        }
         currentRecord.setAssembleId(assembleId);
         
+        // 设置位置信息
+        if (!location.isEmpty()) {
+            currentRecord.setLocation(location);
+        }
+        
         // 兼容旧版本
-        currentLink = new EpcAssembleLink(currentEpcId, assembleId);
-        currentLink.setRssi(currentRssi);
+        currentLink = new EpcAssembleLink(epcId, assembleId);
+        if (!TextUtils.isEmpty(currentRssi)) {
+            currentLink.setRssi(currentRssi);
+        }
         
         tvUploadStatus.setText(getString(R.string.uploading_to_server));
         progressUpload.setVisibility(View.VISIBLE);
@@ -1219,16 +1236,29 @@ public class EpcAssembleLinkFragment extends BaseFragment {
 
     private void createLinkAndSaveLocal() {
         String assembleId = etAssembleId.getText().toString().trim();
+        String location = etLocation.getText().toString().trim();
         String selectedStatus = spinnerStatus.getSelectedItem().toString();
         
+        // 修复：支持无EPC的情况，使用组装件ID作为标识
+        String epcId = TextUtils.isEmpty(currentEpcId) ? "MANUAL_" + assembleId : currentEpcId;
+        
         // 创建新版本EPC记录
-        currentRecord = new EpcRecord(currentEpcId, assembleId, selectedStatus + " (本地保存)");
-        currentRecord.setRssi(currentRssi);
+        currentRecord = new EpcRecord(epcId, assembleId, selectedStatus + " (本地保存)");
+        if (!TextUtils.isEmpty(currentRssi)) {
+            currentRecord.setRssi(currentRssi);
+        }
         currentRecord.setAssembleId(assembleId);
         
+        // 设置位置信息
+        if (!location.isEmpty()) {
+            currentRecord.setLocation(location);
+        }
+        
         // 兼容旧版本
-        currentLink = new EpcAssembleLink(currentEpcId, assembleId);
-        currentLink.setRssi(currentRssi);
+        currentLink = new EpcAssembleLink(epcId, assembleId);
+        if (!TextUtils.isEmpty(currentRssi)) {
+            currentLink.setRssi(currentRssi);
+        }
         currentLink.setUploaded(false);
         
         // Here you would save to local database
@@ -1248,26 +1278,26 @@ public class EpcAssembleLinkFragment extends BaseFragment {
             performUploadV364(record);
         }, (error) -> {
             // 网络不可达，尝试使用旧版本API作为备用
-            Log.w(TAG, "v3.6.4 API连接失败，尝试使用兼容模式: " + error);
+            Log.w(TAG, "v3.6.6 API连接失败，尝试使用兼容模式: " + error);
             uploadToServer(currentLink);
         });
     }
     
     private void performUploadV364(EpcRecord record) {
-        tvUploadStatus.setText("上传到服务器 (v3.6.4)...");
+        tvUploadStatus.setText("上传到服务器 (v3.6.6)...");
         
         String json = gson.toJson(record);
         
         RequestBody body = RequestBody.create(json, MediaType.get("application/json; charset=utf-8"));
         
         Request request = new Request.Builder()
-                .url(SERVER_URL_V364)
+                .url(SERVER_URL_V366)
                 .post(body)
                 .addHeader("Authorization", "Basic " + 
                     android.util.Base64.encodeToString((USERNAME + ":" + PASSWORD).getBytes(), 
                     android.util.Base64.NO_WRAP))
                 .addHeader("Content-Type", "application/json")
-                .addHeader("User-Agent", "UHF-G Android App v3.6.4")
+                .addHeader("User-Agent", "UHF-G Android App v3.6.6")
                 .build();
 
         httpClient.newCall(request).enqueue(new Callback() {
@@ -1276,8 +1306,8 @@ public class EpcAssembleLinkFragment extends BaseFragment {
                 handler.post(() -> {
                     progressUpload.setVisibility(View.GONE);
                     String errorDetail = analyzeNetworkError(e);
-                    tvUploadStatus.setText("v3.6.4上传失败，尝试兼容模式...");
-                    Log.e(TAG, "v3.6.4 Upload failed, falling back to legacy API", e);
+                    tvUploadStatus.setText("v3.6.6上传失败，尝试兼容模式...");
+                    Log.e(TAG, "v3.6.6 Upload failed, falling back to legacy API", e);
                     
                     // 回退到旧版本API
                     uploadToServer(currentLink);
@@ -1289,16 +1319,16 @@ public class EpcAssembleLinkFragment extends BaseFragment {
                 handler.post(() -> {
                     progressUpload.setVisibility(View.GONE);
                     if (response.isSuccessful()) {
-                        tvUploadStatus.setText("上传成功 (v3.6.4增强版)");
-                        showToast("✅ 数据已上传到增强版服务器");
+                        tvUploadStatus.setText("上传成功 (v3.6.6增强版)");
+                        showToast("✅ 数据已上传到v3.6.6增强版服务器");
                         resetForm();
                         
-                        Log.i(TAG, "✅ 成功上传到v3.6.4服务器: EPC=" + record.getEpcId() + 
+                        Log.i(TAG, "✅ 成功上传到v3.6.6服务器: EPC=" + record.getEpcId() + 
                               ", Device=" + record.getDeviceId() + ", Status=" + record.getStatusNote());
                     } else {
-                        tvUploadStatus.setText("服务器错误 (v3.6.4): HTTP " + response.code());
+                        tvUploadStatus.setText("服务器错误 (v3.6.6): HTTP " + response.code());
                         showToast("❌ 服务器错误: " + response.code());
-                        Log.e(TAG, "v3.6.4服务器错误: " + response.code());
+                        Log.e(TAG, "v3.6.6服务器错误: " + response.code());
                     }
                 });
                 response.close();
@@ -1381,7 +1411,7 @@ public class EpcAssembleLinkFragment extends BaseFragment {
                     android.util.Base64.encodeToString((USERNAME + ":" + PASSWORD).getBytes(), 
                     android.util.Base64.NO_WRAP))
                 .addHeader("Content-Type", "application/json")
-                .addHeader("User-Agent", "UHF-G Android App v3.6")
+                .addHeader("User-Agent", "UHF-G Android App v3.6.6")
                 .build();
 
         httpClient.newCall(request).enqueue(new Callback() {
@@ -1421,6 +1451,7 @@ public class EpcAssembleLinkFragment extends BaseFragment {
         currentRecord = null; // 清理新版本记录对象
         tvScannedEpc.setText(getString(R.string.no_epc_scanned));
         etAssembleId.setText("");
+        etLocation.setText("");
         
         // 重置状态选择器到默认值
         if (spinnerStatus != null) {
@@ -1433,26 +1464,49 @@ public class EpcAssembleLinkFragment extends BaseFragment {
 
     private void updateSummary() {
         String assembleId = etAssembleId.getText().toString().trim();
+        String location = etLocation.getText().toString().trim();
         String selectedStatus = "";
         
         if (spinnerStatus != null && spinnerStatus.getSelectedItem() != null) {
             selectedStatus = spinnerStatus.getSelectedItem().toString();
         }
         
+        StringBuilder summary = new StringBuilder();
+        
         if (TextUtils.isEmpty(currentEpcId) && TextUtils.isEmpty(assembleId)) {
             tvLinkSummary.setText(getString(R.string.please_scan_epc_and_enter_assemble));
         } else if (TextUtils.isEmpty(currentEpcId)) {
-            tvLinkSummary.setText(getString(R.string.assemble_id_with_colon) + assembleId + "\n状态: " + selectedStatus + "\n" + getString(R.string.please_enter_assemble_id));
+            summary.append(getString(R.string.assemble_id_with_colon)).append(assembleId).append("\n")
+                   .append("状态: ").append(selectedStatus).append("\n");
+            if (!location.isEmpty()) {
+                summary.append("位置: ").append(location).append("\n");
+            }
+            summary.append(getString(R.string.please_enter_assemble_id));
+            tvLinkSummary.setText(summary.toString());
         } else if (TextUtils.isEmpty(assembleId)) {
-            tvLinkSummary.setText(getString(R.string.epc_with_colon) + currentEpcId + "\n状态: " + selectedStatus + "\n" + getString(R.string.please_enter_assemble_id));
+            summary.append(getString(R.string.epc_with_colon)).append(currentEpcId).append("\n")
+                   .append("状态: ").append(selectedStatus).append("\n");
+            if (!location.isEmpty()) {
+                summary.append("位置: ").append(location).append("\n");
+            }
+            summary.append(getString(R.string.please_enter_assemble_id));
+            tvLinkSummary.setText(summary.toString());
         } else {
-            tvLinkSummary.setText(getString(R.string.epc_with_colon) + currentEpcId + "\n" + getString(R.string.assemble_id_with_colon) + assembleId + "\n状态: " + selectedStatus + "\n" + getString(R.string.ready_to_upload));
+            summary.append(getString(R.string.epc_with_colon)).append(currentEpcId).append("\n")
+                   .append(getString(R.string.assemble_id_with_colon)).append(assembleId).append("\n")
+                   .append("状态: ").append(selectedStatus).append("\n");
+            if (!location.isEmpty()) {
+                summary.append("位置: ").append(location).append("\n");
+            }
+            summary.append(getString(R.string.ready_to_upload));
+            tvLinkSummary.setText(summary.toString());
         }
     }
 
     private void updateButtonStates() {
         String assembleId = etAssembleId.getText().toString().trim();
-        boolean canProceed = !TextUtils.isEmpty(currentEpcId) && !TextUtils.isEmpty(assembleId);
+        // 修复：手动输入组装件ID后也应该能上传（无需EPC也可以）
+        boolean canProceed = !TextUtils.isEmpty(assembleId);
         
         btnConfirmUpload.setEnabled(canProceed);
         btnSaveLocal.setEnabled(canProceed);

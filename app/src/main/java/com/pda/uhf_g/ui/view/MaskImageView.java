@@ -234,7 +234,7 @@ public class MaskImageView extends AppCompatImageView {
     }
     
     /**
-     * 获取裁剪后的图片
+     * 获取裁剪后的图片 - 修复：保持高清晰度
      */
     public Bitmap getCroppedBitmap() {
         if (imageBitmap == null || recognitionRect == null) {
@@ -251,22 +251,38 @@ public class MaskImageView extends AppCompatImageView {
             float transX = imageMatrix[2];
             float transY = imageMatrix[5];
             
-            // 将屏幕坐标转换为图片坐标
-            float cropX = (recognitionRect.left - transX) / scaleX;
-            float cropY = (recognitionRect.top - transY) / scaleY;
-            float cropWidth = recognitionRect.width() / scaleX;
-            float cropHeight = recognitionRect.height() / scaleY;
+            // 将屏幕坐标转换为图片坐标 - 使用更精确的计算
+            double cropX = (recognitionRect.left - transX) / scaleX;
+            double cropY = (recognitionRect.top - transY) / scaleY;
+            double cropWidth = recognitionRect.width() / scaleX;
+            double cropHeight = recognitionRect.height() / scaleY;
             
-            // 确保裁剪区域在图片范围内
-            cropX = Math.max(0, Math.min(cropX, imageBitmap.getWidth()));
-            cropY = Math.max(0, Math.min(cropY, imageBitmap.getHeight()));
-            cropWidth = Math.min(cropWidth, imageBitmap.getWidth() - cropX);
-            cropHeight = Math.min(cropHeight, imageBitmap.getHeight() - cropY);
+            // 修复：使用四舍五入而不是截断，保持更高精度
+            int x = (int) Math.round(Math.max(0, Math.min(cropX, imageBitmap.getWidth())));
+            int y = (int) Math.round(Math.max(0, Math.min(cropY, imageBitmap.getHeight())));
+            int width = (int) Math.round(Math.min(cropWidth, imageBitmap.getWidth() - x));
+            int height = (int) Math.round(Math.min(cropHeight, imageBitmap.getHeight() - y));
             
-            if (cropWidth > 0 && cropHeight > 0) {
-                return Bitmap.createBitmap(imageBitmap, 
-                    (int) cropX, (int) cropY, 
-                    (int) cropWidth, (int) cropHeight);
+            if (width > 0 && height > 0) {
+                // 修复：创建高质量的裁剪图片
+                Bitmap croppedBitmap = Bitmap.createBitmap(imageBitmap, x, y, width, height);
+                
+                // 如果裁剪后图片太小，进行高质量缩放到合适尺寸
+                if (width < 200 || height < 100) {
+                    int targetWidth = Math.max(width * 2, 400);
+                    int targetHeight = Math.max(height * 2, 200);
+                    
+                    Bitmap scaledBitmap = Bitmap.createScaledBitmap(
+                        croppedBitmap, targetWidth, targetHeight, true);
+                    
+                    if (scaledBitmap != croppedBitmap) {
+                        croppedBitmap.recycle(); // 释放原图内存
+                    }
+                    
+                    return scaledBitmap;
+                }
+                
+                return croppedBitmap;
             }
         } catch (Exception e) {
             e.printStackTrace();

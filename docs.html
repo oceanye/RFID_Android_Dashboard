@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPC系统v3.6.6 - 文档中心</title>
+    <style>
+        body {
+            font-family: 'Arial', 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .section h2 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .link-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            background: #f9f9f9;
+        }
+        .link-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+        .link-card h3 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+        }
+        .link-card p {
+            margin: 0 0 15px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .link-card a {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+        .link-card a:hover {
+            background: #5a6fd8;
+        }
+        .status-badge {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .quick-links {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .quick-links h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .quick-links ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .quick-links li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .quick-links li:last-child {
+            border-bottom: none;
+        }
+        .quick-links a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .quick-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏗️ EPC系统v3.6.6</h1>
+            <p>建筑工业RFID追踪系统 - 文档中心</p>
+            <span class="status-badge">在线运行中</span>
+        </div>
+        
+        <div class="content">
+            <div class="quick-links">
+                <h3>🚀 快速访问</h3>
+                <ul>
+                    <li><a href="/">📊 Web Dashboard</a> - 实时数据监控和管理</li>
+                    <li><a href="/health">🔍 健康检查</a> - API服务器状态</li>
+                    <li><a href="/api/dashboard-stats">📈 统计数据</a> - JSON格式统计信息</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>📚 系统文档</h2>
+                <div class="links">
+                    <div class="link-card">
+                        <h3>📋 项目概述</h3>
+                        <p>EPC系统v3.6.6的完整功能介绍、技术架构和使用指南</p>
+                        <a href="README_V366.md">查看文档</a>
+                    </div>
+                    
+                    <div class="link-card">
+                        <h3>🚀 部署指南</h3>
+                        <p>服务器部署、数据库配置、环境搭建的详细步骤</p>
+                        <a href="DEPLOY_README_V366.md">查看文档</a>
+                    </div>
+                    
+                    <div class="link-card">
+                        <h3>📡 API文档</h3>
+                        <p>完整的RESTful API接口说明、参数详解和示例代码</p>
+                        <a href="API_README_V366.md">查看文档</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🔧 系统功能</h2>
+                <div class="links">
+                    <div class="link-card">
+                        <h3>📱 Android应用</h3>
+                        <p>UHF RFID扫描、数据上传、离线模式、状态管理</p>
+                        <a href="#android">了解更多</a>
+                    </div>
+                    
+                    <div class="link-card">
+                        <h3>🌐 Web Dashboard</h3>
+                        <p>实时监控、数据搜索、导出功能、配置管理</p>
+                        <a href="/">访问Dashboard</a>
+                    </div>
+                    
+                    <div class="link-card">
+                        <h3>🗄️ 数据管理</h3>
+                        <p>EPC记录、设备追踪、状态配置、数据统计</p>
+                        <a href="/api/epc-records">查看数据</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🆕 v3.6.6新特性</h2>
+                <div style="background: #e8f5e8; border-radius: 10px; padding: 20px; border-left: 5px solid #28a745;">
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li><strong>真实数据库读写</strong> - 修复模拟数据问题，实现真实数据同步</li>
+                        <li><strong>动态状态配置</strong> - 支持运行时修改扫描状态选项</li>
+                        <li><strong>ID记录查看</strong> - 完整的搜索、过滤和分页功能</li>
+                        <li><strong>数据清空功能</strong> - 安全的数据清理机制</li>
+                        <li><strong>双连接池架构</strong> - 优化数据库连接和权限管理</li>
+                        <li><strong>静态文件服务修复</strong> - Dashboard访问完全正常</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📊 系统状态</h2>
+                <div class="links">
+                    <div class="link-card">
+                        <h3>🔍 实时监控</h3>
+                        <p>服务器状态、API响应时间、数据库连接状态</p>
+                        <a href="/health">检查状态</a>
+                    </div>
+                    
+                    <div class="link-card">
+                        <h3>📈 性能指标</h3>
+                        <p>并发用户数、响应时间、数据容量等性能数据</p>
+                        <a href="/api/dashboard-stats">查看指标</a>
+                    </div>
+                    
+                    <div class="link-card">
+                        <h3>🔧 维护工具</h3>
+                        <p>日志查看、数据备份、系统配置管理</p>
+                        <a href="#maintenance">维护指南</a>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                <p style="margin: 0; color: #666;">
+                    <strong>🚀 EPC系统v3.6.6</strong><br>
+                    建筑工业RFID追踪的完整解决方案<br>
+                    <small>Copyright © 2025 保留所有权利</small>
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
