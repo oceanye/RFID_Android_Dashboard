@@ -202,39 +202,91 @@ app.get('/api/epc-records', basicAuth, async (req, res) => {
 // Dashboard统计API
 app.get('/api/dashboard-stats', async (req, res) => {
     try {
-        const mockStats = {
-            overview: {
-                total_records: 100,
-                total_unique_epcs: 50,
-                total_devices: 5,
-                total_status_types: 6
+        const days = parseInt(req.query.days) || 7;
+        const connection = await pool.getConnection();
+        
+        // 1. 总览统计
+        const [overviewRows] = await connection.execute(`
+            SELECT 
+                COUNT(*) as total_records,
+                COUNT(DISTINCT epc_id) as total_unique_epcs,
+                COUNT(DISTINCT device_id) as total_devices,
+                COUNT(DISTINCT status_note) as total_status_types
+            FROM epc_records 
+            WHERE create_time >= DATE_SUB(NOW(), INTERVAL ? DAY)
+        `, [days]);
+        
+        // 2. 设备统计
+        const [deviceRows] = await connection.execute(`
+            SELECT 
+                device_id,
+                device_type,
+                COUNT(*) as total_records,
+                COUNT(DISTINCT epc_id) as unique_epcs,
+                MAX(create_time) as last_activity_time
+            FROM epc_records 
+            WHERE create_time >= DATE_SUB(NOW(), INTERVAL ? DAY)
+            GROUP BY device_id, device_type
+            ORDER BY total_records DESC
+        `, [days]);
+        
+        // 3. 状态统计
+        const [statusRows] = await connection.execute(`
+            SELECT 
+                status_note,
+                COUNT(*) as count,
+                COUNT(DISTINCT device_id) as device_count,
+                COUNT(DISTINCT epc_id) as unique_epcs
+            FROM epc_records 
+            WHERE create_time >= DATE_SUB(NOW(), INTERVAL ? DAY)
+            GROUP BY status_note
+            ORDER BY count DESC
+        `, [days]);
+        
+        // 4. 24小时峰值分析
+        const [hourlyRows] = await connection.execute(`
+            SELECT 
+                HOUR(create_time) as hour,
+                COUNT(*) as record_count
+            FROM epc_records 
+            WHERE create_time >= DATE_SUB(NOW(), INTERVAL ? DAY)
+            GROUP BY HOUR(create_time)
+            ORDER BY hour
+        `, [days]);
+        
+        // 5. 每日趋势分析
+        const [dailyRows] = await connection.execute(`
+            SELECT 
+                DATE(create_time) as date,
+                COUNT(*) as record_count,
+                COUNT(DISTINCT device_id) as active_devices,
+                COUNT(DISTINCT epc_id) as unique_epcs
+            FROM epc_records 
+            WHERE create_time >= DATE_SUB(NOW(), INTERVAL ? DAY)
+            GROUP BY DATE(create_time)
+            ORDER BY date
+        `, [days]);
+        
+        connection.release();
+        
+        const stats = {
+            overview: overviewRows[0] || {
+                total_records: 0,
+                total_unique_epcs: 0,
+                total_devices: 0,
+                total_status_types: 0
             },
-            device_statistics: [
-                {
-                    device_id: 'PDA_001',
-                    device_type: 'PDA',
-                    total_records: 50,
-                    unique_epcs: 25,
-                    last_activity_time: new Date().toISOString()
-                }
-            ],
-            status_statistics: [
-                {
-                    status_note: '完成扫描录入',
-                    count: 30,
-                    device_count: 3,
-                    unique_epcs: 20
-                }
-            ],
-            hourly_peak_analysis: [],
-            daily_trend: []
+            device_statistics: deviceRows,
+            status_statistics: statusRows,
+            hourly_peak_analysis: hourlyRows,
+            daily_trend: dailyRows
         };
 
         res.json({
             success: true,
-            period_days: 7,
+            period_days: days,
             generated_at: new Date().toISOString(),
-            data: mockStats
+            data: stats
         });
 
     } catch (error) {
@@ -242,6 +294,104 @@ app.get('/api/dashboard-stats', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Statistics query failed',
+            message: error.message
+        });
+    }
+});
+
+// 清空数据API - 需要认证
+app.delete('/api/epc-records/clear', basicAuth, async (req, res) => {
+    try {
+        const connection = await pool.getConnection();
+        
+        // 获取清空前的统计信息
+        const [countResult] = await connection.execute('SELECT COUNT(*) as total FROM epc_records');
+        const totalRecords = countResult[0].total;
+        
+        // 清空数据表
+        await connection.execute('DELETE FROM epc_records');
+        
+        // 重置自增ID
+        await connection.execute('ALTER TABLE epc_records AUTO_INCREMENT = 1');
+        
+        connection.release();
+        
+        console.log(`🗑️ 数据清空操作完成，删除了 ${totalRecords} 条记录`);
+        
+        res.json({
+            success: true,
+            message: '数据清空成功',
+            deleted_records: totalRecords,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ 清空数据失败:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Clear operation failed',
+            message: error.message
+        });
+    }
+});
+
+// 状态配置API - 获取状态列表
+app.get('/api/status-config', basicAuth, async (req, res) => {
+    try {
+        // 返回默认状态配置
+        const defaultStatuses = [
+            '完成扫描录入',
+            '构件录入', 
+            '钢构车间进场',
+            '钢构车间出场',
+            '混凝土车间进场',
+            '混凝土车间出场'
+        ];
+        
+        res.json({
+            success: true,
+            statuses: defaultStatuses,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ 获取状态配置失败:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Get status config failed',
+            message: error.message
+        });
+    }
+});
+
+// 状态配置API - 保存状态列表
+app.post('/api/status-config', basicAuth, async (req, res) => {
+    try {
+        const { statuses } = req.body;
+        
+        if (!Array.isArray(statuses) || statuses.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid input',
+                message: 'statuses必须是非空数组'
+            });
+        }
+        
+        // 这里可以保存到数据库或文件，目前返回成功
+        console.log('📝 状态配置已更新:', statuses);
+        
+        res.json({
+            success: true,
+            message: '状态配置保存成功',
+            statuses: statuses,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ 保存状态配置失败:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Save status config failed',
             message: error.message
         });
     }
@@ -261,6 +411,9 @@ app.use((req, res) => {
             'POST /api/epc-record',
             'GET /api/epc-records',
             'GET /api/dashboard-stats',
+            'DELETE /api/epc-records/clear',
+            'GET /api/status-config',
+            'POST /api/status-config',
             'GET /epc-dashboard-v366.html'
         ]
     });

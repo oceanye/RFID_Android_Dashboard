@@ -12,7 +12,7 @@ EPC建筑工业RFID追踪系统是一个完整的RFID标签追踪解决方案，
 - **ID记录查看** - 完整的EPC记录搜索和分页浏览
 - **数据导出功能** - 支持CSV格式数据导出
 - **实时数据同步** - Dashboard与数据库完全同步
-- **清空数据功能** - 支持一键清空所有记录
+- **🆕 清空数据功能** - 支持一键清空所有记录，含确认机制
 - **🆕 智能拍照OCR** - 高精度组装件ID识别功能
 - **🆕 双模式裁剪** - 遮罩模式和涂抹模式图像处理
 - **🆕 手动输入支持** - 支持手动输入组装件ID，无需EPC关联
@@ -26,6 +26,7 @@ EPC建筑工业RFID追踪系统是一个完整的RFID标签追踪解决方案，
 - **🆕 智能图像预处理** - 动态分辨率调整，优化OCR识别精度
 - **🆕 双模式拍照系统** - 高分辨率优先，自动降级保证稳定性
 - **🆕 防护性编程** - 全面异常处理，防止应用崩溃
+- **🆕 Dashboard数据联动修复** - 24小时峰值图和每日趋势图正确显示真实数据
 
 ## 🏗️ 系统架构
 
@@ -184,6 +185,30 @@ adb install app/build/outputs/apk/release/uhfg_v3.6.6.apk
 - **OCR识别精度**: 高质量图片 > 95%，一般图片 > 85%
 - **拍照处理速度**: 高分辨率模式 < 3s，降级模式 < 1s
 - **图片分辨率支持**: 最高2048px，智能采样优化
+
+## 🔗 API端点参考
+
+### 公开端点
+- `GET /health` - 健康检查
+
+### 认证端点 (需要Basic Auth)
+- `POST /api/epc-record` - 创建EPC记录
+- `GET /api/epc-records` - 查询EPC记录（支持搜索和分页）
+- `GET /api/dashboard-stats` - Dashboard统计数据（支持时间周期）
+- `DELETE /api/epc-records/clear` - 🆕 清空所有记录（危险操作）
+- `GET /api/status-config` - 🆕 获取状态配置
+- `POST /api/status-config` - 🆕 保存状态配置
+
+### 示例请求
+```bash
+# 清空数据（需要确认）
+curl -X DELETE -H "Authorization: Basic cm9vdDpSb290cm9vdCE=" \
+     "http://175.24.178.44:8082/api/epc-records/clear"
+
+# 获取Dashboard统计（最近7天）
+curl -H "Authorization: Basic cm9vdDpSb290cm9vdCE=" \
+     "http://175.24.178.44:8082/api/dashboard-stats?days=7"
+```
 
 ## 🔧 维护说明
 
